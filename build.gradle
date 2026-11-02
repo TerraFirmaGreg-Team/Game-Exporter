@@ -1,0 +1,55 @@
+plugins {
+    id 'base'
+    alias(libs.plugins.legacyforge) apply false
+    alias(libs.plugins.shadow) apply false
+    alias(libs.plugins.spotless) apply false
+}
+
+allprojects {
+    group = "${mod_package}"
+    version = "${mod_version}"
+}
+
+subprojects {
+
+    pluginManager.withPlugin('java') {
+        base {
+            archivesName = "${mod_name}-${mod_name_suffix}"
+        }
+
+        java {
+            toolchain {
+                languageVersion = JavaLanguageVersion.of(findProperty('java_version') as String)
+            }
+        }
+
+        tasks.withType(JavaCompile).configureEach {
+            options.encoding = 'UTF-8'
+            options.release = (findProperty('java_version') as String).toInteger()
+            options.compilerArgs << '-Xlint:deprecation'
+        }
+
+        tasks.withType(Jar).configureEach {
+            manifest {
+                attributes(
+                        'Implementation-Title'  : "${mod_name}-${mod_name_suffix}",
+                        'Implementation-Version': "${mod_version}",
+                        'Implementation-Vendor' : "${mod_authors}"
+                )
+            }
+        }
+
+        apply from: rootProject.file('gradle/scripts/repositories.gradle')
+        apply from: rootProject.file('gradle/scripts/dependencies.gradle')
+        apply from: rootProject.file('gradle/scripts/spotless.gradle')
+    }
+
+    pluginManager.withPlugin('com.gradleup.shadow') {
+        apply from: rootProject.file('gradle/scripts/packaging.gradle')
+        apply from: rootProject.file('gradle/scripts/resources.gradle')
+    }
+}
+
+tasks.named('build') {
+    dependsOn ':modern:build', ':vintage:build'
+}

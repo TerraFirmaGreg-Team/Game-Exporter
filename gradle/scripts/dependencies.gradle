@@ -1,0 +1,8 @@
+def libs = extensions.getByName('libs')
+
+dependencies {
+    compileOnly libs.annotations
+    annotationProcessor libs.annotations
+    compileOnly libs.lombok
+    annotationProcessor libs.lombok
+}

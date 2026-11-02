@@ -1,0 +1,45 @@
+plugins {
+    id 'java'
+    id 'com.cleanroommc.cleanroomgradle'
+    alias(libs.plugins.shadow)
+}
+
+dependencies {
+    implementation cleanroom.userdev(loader_version) {
+        accessTransformers.from('src/main/resources/META-INF/accesstransformer.cfg')
+    }
+}
+
+cleanroom {
+    runs {
+        client {
+            configure {
+                username = minecraft_username
+                jvmArgs extra_jvm_args.tokenize()
+            }
+        }
+        server {
+            configure {
+                args '--nogui'
+                jvmArgs extra_jvm_args.tokenize()
+            }
+        }
+    }
+}
+
+tasks.withType(JavaExec).configureEach {
+    systemProperty 'foundation.loadsall', 'true'
+}
+
+shadowJar {
+    manifest {
+        attributes 'ModType': 'CRL'
+        attributes 'FMLAT': 'accesstransformer.cfg'
+    }
+}
+
+tasks.named('reobfJar') {
+    from tasks.shadowJar
+    archiveClassifier = ''
+    output = rootProject.layout.buildDirectory.file("libs/${base.archivesName.get()}-${version}.jar")
+}

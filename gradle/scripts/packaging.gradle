@@ -1,0 +1,26 @@
+evaluationDependsOn(':core')
+
+configurations {
+    embed
+    implementation.extendsFrom(embed)
+}
+
+dependencies {
+    implementation project(':core')
+}
+
+tasks.named('jar').configure {
+    enabled = false
+}
+
+def embedConfig = configurations.embed
+
+shadowJar {
+    from project(':core').sourceSets.main.output
+    configurations.set([embedConfig])
+    enableAutoRelocation = true
+    relocationPrefix = "${mod_package}.${mod_id}.shadow"
+    mergeServiceFiles()
+    destinationDirectory = layout.buildDirectory.dir('tmp')
+    archiveClassifier = ''
+}

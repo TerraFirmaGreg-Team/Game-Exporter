@@ -1,0 +1,25 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal() {
+            content {
+                excludeGroup('org.apache.logging.log4j')
+            }
+        }
+        mavenCentral()
+        maven { url = 'https://maven.cleanroommc.com' }
+        maven { url = 'https://maven.neoforged.net/releases' }
+        maven { url = 'https://maven.minecraftforge.net/' }
+    }
+}
+
+plugins {
+    id 'com.cleanroommc.cleanroomgradle.settings' version '0.23.0'
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
+}
+
+rootProject.name = "${mod_name}"
+
+['core', 'modern', 'vintage'].each { name ->
+    include ":$name"
+    project(":$name").projectDir = file("modules/$name")
+}
