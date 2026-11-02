@@ -15,4 +15,15 @@ repositories {
             includeGroup 'maven.modrinth'
         }
     }
+    maven {
+        name = 'TerraformersMC'
+        url = 'https://maven.terraformersmc.com/'
+    }
+    maven {
+        name = 'Sponge'
+        url = 'https://repo.spongepowered.org/maven'
+        content {
+            includeGroupByRegex 'org\\.spongepowered.*'
+        }
+    }
 }

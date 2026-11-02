@@ -1,0 +1,24 @@
+{
+    id: "5B2E8C1A0F9D4E7B",
+    title: "Getting Started",
+    description: [
+        "Line one with 'single quotes'",
+        "Line two with \"double quotes\" and \\ backslash",
+        "Unicode: Привет мир"
+    ],
+    order_index: 3b,
+    chapter_groups: ["core", "progression"],
+    quest: {
+        x: -1.5,
+        y: 2,
+        shape: "hexagon",
+        rewards: [
+            { type: "item", item: "minecraft:stone", count: 64 },
+            { type: "xp", amount: 100 }
+        ],
+        tags: [I; 1, 2, 3],
+        flags: { hidden: true, silent: false, auto: null },
+        deps: [],
+        meta: { bytes: [B; 1b, 2b], longs: [L; 100, 20000000000] }
+    }
+}

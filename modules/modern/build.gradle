@@ -2,6 +2,14 @@ plugins {
     id 'java'
     alias(libs.plugins.legacyforge)
     alias(libs.plugins.shadow)
+    alias(libs.plugins.jvmdowngrader)
+}
+
+dependencies {
+    modApi "dev.emi:emi-forge:${libs.versions.emi.get()}@jar"
+    modApi libs.patchouli
+    modApi "maven.modrinth:reliable-emi:oadZsgpm"
+    compileOnly libs.mixin
 }
 
 legacyForge {
@@ -40,6 +48,7 @@ legacyForge {
 shadowJar {
     manifest {
         attributes 'FMLAT': 'accesstransformer.cfg'
+        attributes 'MixinConfigs': 'exporter.mixins.json'
     }
 }
 
@@ -53,4 +62,9 @@ obfuscation {
 
 tasks.named('reobfShadowJar') {
     destinationDirectory = rootProject.layout.buildDirectory.dir('libs')
+    input.set(tasks.named('shadeDowngradedApi').flatMap { it.archiveFile })
+    dependsOn 'downgradeEmbed'
+    libraries.setFrom(
+            sourceSets.main.compileClasspath.minus(configurations.embed),
+            tasks.named('downgradeEmbed').map { it.outputMap.values() })
 }

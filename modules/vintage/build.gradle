@@ -2,12 +2,19 @@ plugins {
     id 'java'
     id 'com.cleanroommc.cleanroomgradle'
     alias(libs.plugins.shadow)
+    alias(libs.plugins.jvmdowngrader)
+}
+
+def modApiConfig = configurations.maybeCreate('modApi')
+configurations.matching { it.name == 'runtimeOnly' }.configureEach {
+    extendsFrom modApiConfig
 }
 
 dependencies {
     implementation cleanroom.userdev(loader_version) {
         accessTransformers.from('src/main/resources/META-INF/accesstransformer.cfg')
     }
+    modApi libs.jei
 }
 
 cleanroom {
@@ -39,7 +46,7 @@ shadowJar {
 }
 
 tasks.named('reobfJar') {
-    from tasks.shadowJar
+    from tasks.named('shadeDowngradedApi')
     archiveClassifier = ''
     output = rootProject.layout.buildDirectory.file("libs/${base.archivesName.get()}-${version}.jar")
 }

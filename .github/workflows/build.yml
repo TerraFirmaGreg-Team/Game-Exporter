@@ -32,34 +32,16 @@ jobs:
       version: ${{ steps.info.outputs.version }}
       version_type: ${{ steps.info.outputs.version_type }}
       full_name: ${{ steps.info.outputs.full_name }}
-      java_version: ${{ steps.info.outputs.java_version }}
+      java_versions: ${{ steps.info.outputs.java_versions }}
+      platforms: ${{ steps.info.outputs.platforms }}
       make_release: ${{ steps.info.outputs.make_release }}
-      modern_suffix: ${{ steps.modern.outputs.mod_name_suffix }}
-      modern_loader: ${{ steps.modern.outputs.loader }}
-      modern_mc: ${{ steps.modern.outputs.minecraft_version }}
-      modern_java: ${{ steps.modern.outputs.java_version }}
-      vintage_suffix: ${{ steps.vintage.outputs.mod_name_suffix }}
-      vintage_loader: ${{ steps.vintage.outputs.loader }}
-      vintage_mc: ${{ steps.vintage.outputs.minecraft_version }}
-      vintage_java: ${{ steps.vintage.outputs.java_version }}
     steps:
       - name: Collect info
         id: info
         uses: TerraFirmaGreg-Team/Actions/mod/info@main
         with:
           required_files: "gradle.properties, build.gradle, README.md, modules"
-      - name: Modern properties
-        id: modern
-        uses: madhead/read-java-properties@latest
-        with:
-          file: modules/modern/gradle.properties
-          all: true
-      - name: Vintage properties
-        id: vintage
-        uses: madhead/read-java-properties@latest
-        with:
-          file: modules/vintage/gradle.properties
-          all: true
+          platforms_dir: modules
 
   build:
     name: "[📦] Project Build"
@@ -71,52 +53,36 @@ jobs:
         with:
           version: ${{ needs.info.outputs.version }}
           replace_version: true
-          java_version: |
-            ${{ needs.info.outputs.java_version }}
-            ${{ needs.info.outputs.modern_java }}
-            ${{ needs.info.outputs.vintage_java }}
+          java_version: ${{ needs.info.outputs.java_versions }}
           gradle_args: build --no-daemon
           artifact_name: ${{ needs.info.outputs.full_name }}
           artifact_path: build/libs/*.jar
 
   release:
-    name: "[🚀] Project Release"
+    name: "[🚀] Release ${{ matrix.platform.id }}"
     needs: [info, build]
     runs-on: ubuntu-latest
     if: ${{ needs.info.outputs.make_release == 'true' }}
+    strategy:
+      max-parallel: 1
+      matrix:
+        platform: ${{ fromJSON(needs.info.outputs.platforms) }}
     steps:
-      - name: Publish modern
+      - name: Publish
         uses: TerraFirmaGreg-Team/Actions/mod/release@main
         with:
-          full_name: ${{ needs.info.outputs.name }}-${{ needs.info.outputs.modern_suffix }}-${{ needs.info.outputs.version }}
+          full_name: ${{ matrix.platform.base }}-${{ needs.info.outputs.version }}
           version: ${{ needs.info.outputs.version }}
           version_type: ${{ needs.info.outputs.version_type }}
-          files: ${{ needs.info.outputs.name }}-${{ needs.info.outputs.modern_suffix }}-*.jar
-          loaders: ${{ needs.info.outputs.modern_loader }}
-          game_versions: ${{ needs.info.outputs.modern_mc }}
-          java: ${{ needs.info.outputs.modern_java }}
-          environment: client
+          files: ${{ matrix.platform.base }}-*.jar
+          loaders: ${{ matrix.platform.loader }}
+          game_versions: ${{ matrix.platform.game_versions }}
+          java: ${{ matrix.platform.java }}
+          environment: "client | server"
           github_name: ${{ needs.info.outputs.version }}
           github_prerelease: ${{ needs.info.outputs.version_type != 'release' }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          modrinth_id: ${{ vars.MODRINTH_ID }}
-          modrinth_token: ${{ secrets.MODRINTH_TOKEN }}
-          curseforge_id: ${{ vars.CURSEFORGE_ID }}
-          curseforge_token: ${{ secrets.CURSEFORGE_TOKEN }}
-
-      - name: Publish vintage
-        uses: TerraFirmaGreg-Team/Actions/mod/release@main
-        with:
-          full_name: ${{ needs.info.outputs.name }}-${{ needs.info.outputs.vintage_suffix }}-${{ needs.info.outputs.version }}
-          version: ${{ needs.info.outputs.version }}
-          version_type: ${{ needs.info.outputs.version_type }}
-          files: ${{ needs.info.outputs.name }}-${{ needs.info.outputs.vintage_suffix }}-*.jar
-          loaders: ${{ needs.info.outputs.vintage_loader }}
-          game_versions: ${{ needs.info.outputs.vintage_mc }}
-          java: ${{ needs.info.outputs.vintage_java }}
-          environment: client
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          modrinth_id: ${{ vars.MODRINTH_ID }}
-          modrinth_token: ${{ secrets.MODRINTH_TOKEN }}
-          curseforge_id: ${{ vars.CURSEFORGE_ID }}
-          curseforge_token: ${{ secrets.CURSEFORGE_TOKEN }}
+#          modrinth_id: ${{ vars.MODRINTH_ID }}
+#          modrinth_token: ${{ secrets.MODRINTH_TOKEN }}
+#          curseforge_id: ${{ vars.CURSEFORGE_ID }}
+#          curseforge_token: ${{ secrets.CURSEFORGE_TOKEN }}

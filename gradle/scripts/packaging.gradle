@@ -5,22 +5,59 @@ configurations {
     implementation.extendsFrom(embed)
 }
 
+configurations.matching { it.name == 'additionalRuntimeClasspath' }.configureEach {
+    extendsFrom configurations.embed
+    project.dependencies.add(name, project(':core'))
+    exclude group: 'it.unimi.dsi', module: 'fastutil-core'
+}
+
 dependencies {
     implementation project(':core')
+    embed libs.jackson.databind
+    embed libs.jackson.blackbird
+    embed libs.fastutil
+    embed libs.webp4j
+    embed libs.jsonschema.generator
+    embed libs.jsonschema.module.jackson
+    embed libs.konf.core
+    embed libs.konf.json
+    embed libs.jspecify
+}
+
+pluginManager.withPlugin('xyz.wagyourtail.jvmdowngrader') {
+    project.jvmdg.downgradeTo = JavaVersion.VERSION_21
+
+    project.tasks.named('downgradeJar') { t ->
+        t.destinationDirectory = project.layout.buildDirectory.dir('jvmdg')
+    }
+    project.tasks.named('shadeDowngradedApi') { t ->
+        t.destinationDirectory = project.layout.buildDirectory.dir('jvmdg')
+    }
+
+    project.tasks.register('downgradeEmbed',
+            project.jvmdg.getClass().classLoader.loadClass(
+                    'xyz.wagyourtail.jvmdg.gradle.task.files.DowngradeFiles')) { t ->
+        t.inputCollection = project.configurations.embed
+    }
 }
 
 tasks.named('jar').configure {
     enabled = false
 }
 
-def embedConfig = configurations.embed
-
 shadowJar {
     from project(':core').sourceSets.main.output
-    configurations.set([embedConfig])
+    exclude 'META-INF/versions/**'
+    addMultiReleaseAttribute = false
+    configurations.set([project.configurations.embed])
     enableAutoRelocation = true
+    relocate 'team.terrafirmagreg.konf', 'team.terrafirmagreg.konf'
     relocationPrefix = "${mod_package}.${mod_id}.shadow"
     mergeServiceFiles()
     destinationDirectory = layout.buildDirectory.dir('tmp')
     archiveClassifier = ''
+}
+
+configurations.configureEach {
+    resolutionStrategy.force 'com.electronwill.night-config:json:3.6.7'
 }

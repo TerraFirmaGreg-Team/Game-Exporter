@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.legacyforge) apply false
     alias(libs.plugins.shadow) apply false
     alias(libs.plugins.spotless) apply false
+    alias(libs.plugins.jvmdowngrader) apply false
 }
 
 allprojects {
@@ -26,7 +27,7 @@ subprojects {
         tasks.withType(JavaCompile).configureEach {
             options.encoding = 'UTF-8'
             options.release = (findProperty('java_version') as String).toInteger()
-            options.compilerArgs << '-Xlint:deprecation'
+            options.compilerArgs << '-Xlint:all,-processing'
         }
 
         tasks.withType(Jar).configureEach {

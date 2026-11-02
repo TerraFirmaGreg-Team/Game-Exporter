@@ -8,6 +8,7 @@ spotless {
         target 'src/*/java/**/*.java'
         palantirJavaFormat(libs.versions.palantir.java.format.get()).formatJavadoc(true)
         removeUnusedImports()
+        shortenFullyQualifiedTypes()
         trimTrailingWhitespace()
         endWithNewline()
     }

@@ -1,0 +1,54 @@
+package team.terrafirmagreg.exporter.contract.schema;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.util.Set;
+import java.util.stream.Collectors;
+import org.junit.jupiter.api.Test;
+
+class DumpSchemasTest {
+
+    private static final Set<String> DOCUMENTED = Set.of(
+            "manifest",
+            "meta/report",
+            "registry/items",
+            "registry/blocks",
+            "registry/fluids",
+            "registry/entities",
+            "registry/tabs",
+            "registry/tags",
+            "registry/recipe_categories",
+            "registry/groups",
+            "registry/recipes",
+            "data/models/model",
+            "data/recipes/recipe",
+            "data/quests/data",
+            "data/quests/chapter_groups",
+            "data/quests/chapter",
+            "data/guides/book",
+            "data/guides/category",
+            "data/guides/entry",
+            "lang",
+            "keybinds");
+
+    @Test
+    void coversEveryDocumentedSchemaPath() {
+        Set<String> emitted = DumpSchemas.all().stream().map(DumpSchema::id).collect(Collectors.toSet());
+        assertEquals(DOCUMENTED, emitted);
+    }
+
+    @Test
+    void idsAreUnique() {
+        long distinct =
+                DumpSchemas.all().stream().map(DumpSchema::id).distinct().count();
+        assertEquals(DumpSchemas.all().size(), distinct);
+    }
+
+    @Test
+    void generatesForEverySchema() {
+        SchemaGenerator generator = new SchemaGenerator();
+        for (DumpSchema schema : DumpSchemas.all()) {
+            assertNotNull(generator.generate(schema), schema.id());
+        }
+    }
+}

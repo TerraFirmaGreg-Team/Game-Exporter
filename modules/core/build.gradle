@@ -3,6 +3,20 @@ plugins {
 }
 
 dependencies {
+    api platform(libs.jackson.bom)
+    api libs.jackson.databind
+    implementation libs.jackson.blackbird
+    api libs.fastutil
+    implementation libs.webp4j
+    api libs.jspecify
+    compileOnly libs.log4j.api
+    testImplementation libs.log4j.api
+    testCompileOnly libs.lombok
+    testAnnotationProcessor libs.lombok
+    implementation libs.jsonschema.generator
+    implementation libs.jsonschema.module.jackson
+    api libs.konf.core
+    api libs.konf.json
     testImplementation platform(libs.junit.bom)
     testImplementation libs.junit.jupiter
     testRuntimeOnly libs.junit.platform.launcher
@@ -10,4 +24,5 @@ dependencies {
 
 test {
     useJUnitPlatform()
+    jvmArgs '--enable-native-access=ALL-UNNAMED'
 }

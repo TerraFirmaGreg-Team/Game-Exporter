@@ -1,8 +1,10 @@
 def libs = extensions.getByName('libs')
 
+configurations.matching { it.name == 'modApi' }.configureEach { cfg ->
+    configurations.compileOnly.extendsFrom(cfg)
+}
+
 dependencies {
-    compileOnly libs.annotations
-    annotationProcessor libs.annotations
     compileOnly libs.lombok
     annotationProcessor libs.lombok
 }
