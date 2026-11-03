@@ -15,7 +15,8 @@ public abstract class SceneFluidCaptureMixin {
     @Inject(
             method = "renderFluid(Ldev/emi/emi/api/stack/FluidEmiStack;Lcom/mojang/blaze3d/vertex/PoseStack;IIFIIII)V",
             at = @At("HEAD"),
-            cancellable = true)
+            cancellable = true,
+            remap = false)
     private static void gameExporter$sceneFluid(
             FluidEmiStack stack,
             PoseStack matrices,

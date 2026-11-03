@@ -10,10 +10,18 @@ dependencies {
     modApi libs.patchouli
     modApi "maven.modrinth:reliable-emi:oadZsgpm"
     compileOnly libs.mixin
+    annotationProcessor "org.spongepowered:mixin:${libs.versions.mixin.get()}:processor"
 }
+
+def exporterRefmap = null
 
 legacyForge {
     version = "${minecraft_version}-${loader_version}"
+
+    mixin {
+        config 'exporter.mixins.json'
+        exporterRefmap = add sourceSets.main, 'exporter.mixins.refmap.json'
+    }
 
     accessTransformers = project.files('src/main/resources/META-INF/accesstransformer.cfg')
 
@@ -50,6 +58,7 @@ shadowJar {
         attributes 'FMLAT': 'accesstransformer.cfg'
         attributes 'MixinConfigs': 'exporter.mixins.json'
     }
+    from(exporterRefmap)
 }
 
 tasks.named('reobfJar') {

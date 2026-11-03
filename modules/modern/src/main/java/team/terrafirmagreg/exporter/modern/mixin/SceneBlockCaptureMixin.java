@@ -22,7 +22,8 @@ public abstract class SceneBlockCaptureMixin {
     @Inject(
             method =
                     "tesselateBlock(Lnet/minecraft/world/level/BlockAndTintGetter;Lnet/minecraft/client/resources/model/BakedModel;Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/core/BlockPos;Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;ZLnet/minecraft/util/RandomSource;JILnet/minecraftforge/client/model/data/ModelData;Lnet/minecraft/client/renderer/RenderType;)V",
-            at = @At("HEAD"))
+            at = @At("HEAD"),
+            remap = false)
     private void gameExporter$sceneBlock(
             BlockAndTintGetter level,
             BakedModel model,

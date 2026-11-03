@@ -32,6 +32,7 @@ pluginManager.withPlugin('xyz.wagyourtail.jvmdowngrader') {
     }
     project.tasks.named('shadeDowngradedApi') { t ->
         t.destinationDirectory = project.layout.buildDirectory.dir('jvmdg')
+        t.shadePath = 'team/terrafirmagreg/exporter/jvmdg'
     }
 
     project.tasks.register('downgradeEmbed',
