@@ -51,8 +51,14 @@ shadowJar {
     exclude 'META-INF/versions/**'
     addMultiReleaseAttribute = false
     configurations.set([project.configurations.embed])
-    enableAutoRelocation = true
-    relocate 'team.terrafirmagreg.konf', 'team.terrafirmagreg.konf'
+    enableAutoRelocation = false
+    relocate 'com.electronwill', "${mod_package}.${mod_id}.shadow.com.electronwill"
+    relocate 'com.fasterxml', "${mod_package}.${mod_id}.shadow.com.fasterxml"
+    relocate 'com.github.victools', "${mod_package}.${mod_id}.shadow.com.github.victools"
+    relocate 'it.unimi', "${mod_package}.${mod_id}.shadow.it.unimi"
+    relocate 'org.jspecify', "${mod_package}.${mod_id}.shadow.org.jspecify"
+    relocate 'org.slf4j', "${mod_package}.${mod_id}.shadow.org.slf4j"
+    relocate 'tools.jackson', "${mod_package}.${mod_id}.shadow.tools.jackson"
     relocationPrefix = "${mod_package}.${mod_id}.shadow"
     mergeServiceFiles()
     destinationDirectory = layout.buildDirectory.dir('tmp')
