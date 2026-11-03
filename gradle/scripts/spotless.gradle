@@ -19,3 +19,8 @@ spotless {
         endWithNewline()
     }
 }
+
+tasks.named('check') { dependsOn 'spotlessApply' }
+tasks.matching { it.name.startsWith('spotless') && it.name.endsWith('Check') }.configureEach {
+    mustRunAfter 'spotlessApply'
+}

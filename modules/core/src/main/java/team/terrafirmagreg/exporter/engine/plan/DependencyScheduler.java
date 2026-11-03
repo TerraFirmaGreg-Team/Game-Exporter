@@ -1,6 +1,8 @@
 package team.terrafirmagreg.exporter.engine.plan;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -35,7 +37,10 @@ public final class DependencyScheduler {
                 return null;
             });
         } catch (Throwable failure) {
-            log.warn("failed: {}", unwrap(failure));
+            Throwable unwrapped = unwrap(failure);
+            StringWriter stack = new StringWriter();
+            unwrapped.printStackTrace(new PrintWriter(stack));
+            log.warn("failed: {}", stack);
             throw failure;
         }
         log.info("done {}ms", (System.nanoTime() - started) / 1_000_000L);
