@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import lombok.experimental.UtilityClass;
 import team.terrafirmagreg.exporter.dump.DumpFiles;
 import team.terrafirmagreg.exporter.util.ExportLog;
+import team.terrafirmagreg.exporter.util.Io;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.json.JsonReadFeature;
 import tools.jackson.core.json.JsonWriteFeature;
@@ -64,11 +65,11 @@ public class DumpWriter {
     }
 
     public static JsonNode readTree(String json) throws IOException {
-        return mapper().readTree(json);
+        return mapper().readTree(Io.stripBom(json));
     }
 
     public static JsonNode readTree(Reader reader) throws IOException {
-        return mapper().readTree(reader);
+        return mapper().readTree(Io.skipBom(reader));
     }
 
     public static JsonNode readTree(Path file) throws IOException {
@@ -76,7 +77,7 @@ public class DumpWriter {
     }
 
     public static JsonNode readGameTree(Reader reader) throws IOException {
-        return GAME_READ.readTree(reader);
+        return GAME_READ.readTree(Io.skipBom(reader));
     }
 
     public static JsonNode readGameTree(Path file) throws IOException {
@@ -84,7 +85,7 @@ public class DumpWriter {
     }
 
     public static <T> T readValue(Reader reader, Class<T> type) throws IOException {
-        return mapper().readValue(reader, type);
+        return mapper().readValue(Io.skipBom(reader), type);
     }
 
     public static <T> T readValue(Path file, Class<T> type) throws IOException {
@@ -92,7 +93,7 @@ public class DumpWriter {
     }
 
     public static <T> T readValue(Reader reader, TypeReference<T> type) throws IOException {
-        return mapper().readValue(reader, type);
+        return mapper().readValue(Io.skipBom(reader), type);
     }
 
     public static <T> T readValue(Path file, TypeReference<T> type) throws IOException {

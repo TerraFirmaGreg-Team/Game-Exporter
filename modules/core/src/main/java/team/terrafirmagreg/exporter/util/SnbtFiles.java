@@ -11,7 +11,7 @@ import tools.jackson.databind.JsonNode;
 public class SnbtFiles {
 
     public static JsonNode parse(Path file) throws IOException {
-        String text = Files.readString(file, StandardCharsets.UTF_8);
+        String text = Io.stripBom(Files.readString(file, StandardCharsets.UTF_8));
         StringBuilder cleaned = new StringBuilder(text.length());
         for (String line : text.lines().toList()) {
             int comment = indexOfComment(line);

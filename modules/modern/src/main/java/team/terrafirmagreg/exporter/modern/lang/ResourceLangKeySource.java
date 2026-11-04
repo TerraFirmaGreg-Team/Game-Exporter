@@ -8,6 +8,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
 import team.terrafirmagreg.exporter.assets.lang.LangKeySource;
+import team.terrafirmagreg.exporter.util.ExportLog;
 
 @UtilityClass
 public class ResourceLangKeySource {
@@ -18,11 +19,13 @@ public class ResourceLangKeySource {
         }
         Set<String> keys = new TreeSet<>();
         for (String namespace : assets.getNamespaces()) {
-            for (Resource layer : assets.getResourceStack(
-                    ResourceLocation.fromNamespaceAndPath(namespace, "lang/" + language + ".json"))) {
+            String path = "lang/" + language + ".json";
+            for (Resource layer :
+                    assets.getResourceStack(ResourceLocation.fromNamespaceAndPath(namespace, path))) {
                 try (BufferedReader reader = layer.openAsReader()) {
                     keys.addAll(LangKeySource.jsonKeys(reader));
-                } catch (Exception ignored) {
+                } catch (Exception e) {
+                    ExportLog.warn("failed reading lang keys {}:{} layer", namespace, path, e);
                 }
             }
         }

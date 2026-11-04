@@ -12,6 +12,7 @@ import java.util.Map;
 import lombok.experimental.UtilityClass;
 import team.terrafirmagreg.exporter.dump.io.DumpWriter;
 import team.terrafirmagreg.exporter.engine.spec.options.ModIdFilter;
+import team.terrafirmagreg.exporter.util.Io;
 import team.terrafirmagreg.exporter.util.SnbtFiles;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -93,6 +94,7 @@ public class LangMerge {
     }
 
     public static void mergeLangLines(Map<String, Object> into, BufferedReader reader) throws IOException {
+        Io.skipBom(reader);
         for (String line : reader.lines().toList()) {
             if (line.isBlank() || line.startsWith("#")) {
                 continue;

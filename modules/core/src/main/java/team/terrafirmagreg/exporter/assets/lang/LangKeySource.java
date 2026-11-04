@@ -11,6 +11,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import lombok.experimental.UtilityClass;
 import team.terrafirmagreg.exporter.dump.io.DumpWriter;
+import team.terrafirmagreg.exporter.util.ExportLog;
 import team.terrafirmagreg.exporter.util.SnbtFiles;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -25,7 +26,8 @@ public class LangKeySource {
         Map<String, Map<String, Object>> byMod = new Object2ObjectLinkedOpenHashMap<>();
         try {
             LangMerge.mergeOverridesIntoByMod(byMod, gameDir, lang);
-        } catch (IOException ignored) {
+        } catch (IOException e) {
+            ExportLog.warn("failed reading lang overrides lang={}", lang, e);
             return Set.of();
         }
         Set<String> keys = new TreeSet<>();
@@ -64,7 +66,8 @@ public class LangKeySource {
             } else {
                 LangMerge.mergeJsonFile(into, file);
             }
-        } catch (IOException ignored) {
+        } catch (IOException e) {
+            ExportLog.warn("failed reading lang keys {}", file, e);
             return Set.of();
         }
         return Set.copyOf(into.keySet());
@@ -77,7 +80,8 @@ public class LangKeySource {
         Map<String, Object> into = new Object2ObjectLinkedOpenHashMap<>();
         try (BufferedReader reader = Files.newBufferedReader(file)) {
             LangMerge.mergeLangLines(into, reader);
-        } catch (IOException ignored) {
+        } catch (IOException e) {
+            ExportLog.warn("failed reading lang lines {}", file, e);
             return Set.of();
         }
         return Set.copyOf(into.keySet());

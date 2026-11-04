@@ -19,6 +19,7 @@ public class StoragePublish {
     public static void run(ExportSpec request, Path dumpRoot, RunScope scope) {
         StorageOptions options = StorageOptions.of(ExportConfig.storage);
         if (!options.enabled()) {
+            LOG.info("disabled (storage.type=off)");
             return;
         }
         PackInfo pack = request.pack();
@@ -29,6 +30,7 @@ public class StoragePublish {
         String segment = segment(pack);
         try {
             StorageTarget target = target(options);
+            LOG.info("storage {} -> {}/{}: syncing", options.type(), pack.id(), segment);
             StorageSync.Stats stats = StorageSync.sync(target, new StorageJob(dumpRoot, pack.id(), segment, options));
             scope.metrics().record("storageUploaded", stats.uploaded());
             scope.metrics().record("storageSkipped", stats.skipped());
