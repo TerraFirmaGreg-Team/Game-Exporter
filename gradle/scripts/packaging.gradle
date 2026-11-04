@@ -68,3 +68,10 @@ shadowJar {
 configurations.configureEach {
     resolutionStrategy.force 'com.electronwill.night-config:json:3.6.7'
 }
+
+configurations.embed {
+    resolutionStrategy.force 'tools.jackson.core:jackson-databind:3.2.3',
+        'tools.jackson.core:jackson-core:3.2.3',
+        'tools.jackson.module:jackson-module-blackbird:3.2.3',
+        'com.fasterxml.jackson.core:jackson-annotations:2.22'
+}

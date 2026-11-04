@@ -81,15 +81,15 @@ class StorageSyncTest {
     }
 
     @Test
-    void metaIsNeverUploaded() throws IOException {
+    void metaAndSchemaAreNeverUploaded() throws IOException {
         Path root = dumpTree();
         LocalStorage target = new LocalStorage(tmp.resolve("store"));
         sync(root, target, false);
-        assertTrue(target.listKeys("pack/").stream().noneMatch(k -> k.contains("meta/")));
+        assertTrue(target.listKeys("pack/").stream().noneMatch(k -> k.contains("meta/") || k.contains("schema/")));
     }
 
     @Test
-    void inlineJsonGzipsExceptManifestAndSchema() throws IOException {
+    void inlineJsonGzipsExceptManifest() throws IOException {
         Path root = dumpTree();
         Path storeRoot = tmp.resolve("store");
         LocalStorage target = new LocalStorage(storeRoot);
@@ -98,7 +98,7 @@ class StorageSyncTest {
         assertNotNull(lang);
         assertEquals("{\"a\":\"b\"}", gunzip(lang));
         assertNotNull(stored(storeRoot, "pack/1.0.0/manifest.json"));
-        assertNotNull(stored(storeRoot, "pack/1.0.0/schema/manifest.json"));
+        assertNull(stored(storeRoot, "pack/1.0.0/schema/manifest.json"));
         assertNull(stored(storeRoot, "pack/1.0.0/manifest.json.gz"));
     }
 

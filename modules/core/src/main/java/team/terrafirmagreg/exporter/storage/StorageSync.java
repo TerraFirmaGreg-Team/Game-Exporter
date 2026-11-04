@@ -27,7 +27,6 @@ import team.terrafirmagreg.exporter.dump.io.DumpWriter;
 public class StorageSync {
     public static final String VERSIONS = "versions.json";
     public static final String OBJECTS_INDEX = "objects.json";
-    private static final Set<String> PLAIN_JSON = Set.of("manifest.json", "schema/");
     private static final String CACHE_OBJECT = "public, max-age=31536000, immutable";
     private static final String CACHE_RESOLVER = "public, max-age=60";
     private static final String CACHE_VERSIONED = "public, max-age=3600";
@@ -119,7 +118,7 @@ public class StorageSync {
     private static String relativize(Path root, Path file) {
         String rel =
                 root.relativize(file.toAbsolutePath().normalize()).toString().replace('\\', '/');
-        if (rel.startsWith("meta/") || rel.equals(VERSIONS) || rel.equals(OBJECTS_INDEX)) {
+        if (rel.startsWith("meta/") || rel.startsWith("schema/") || rel.equals(VERSIONS) || rel.equals(OBJECTS_INDEX)) {
             return null;
         }
         return rel;
@@ -135,15 +134,7 @@ public class StorageSync {
     }
 
     private static boolean gzipInline(String rel) {
-        if (!rel.endsWith(".json")) {
-            return false;
-        }
-        for (String index : PLAIN_JSON) {
-            if (rel.startsWith(index)) {
-                return false;
-            }
-        }
-        return true;
+        return rel.endsWith(".json") && !rel.equals("manifest.json");
     }
 
     private static byte[] gzip(byte[] raw) throws IOException {
