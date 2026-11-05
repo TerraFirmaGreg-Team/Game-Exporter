@@ -22,6 +22,7 @@ import team.terrafirmagreg.exporter.contract.dto.storage.VersionsIndex;
 import team.terrafirmagreg.exporter.dump.DumpFiles;
 import team.terrafirmagreg.exporter.dump.io.DumpHashes;
 import team.terrafirmagreg.exporter.dump.io.DumpWriter;
+import team.terrafirmagreg.exporter.util.ExportLog;
 
 @UtilityClass
 public class StorageSync {
@@ -84,7 +85,7 @@ public class StorageSync {
                         byte[] payload = entry.gzip()
                                 ? gzip(Files.readAllBytes(entry.source()))
                                 : Files.readAllBytes(entry.source());
-                        target.put(entry.key(), payload, mediaType(entry.key()), cacheControl(entry.key()));
+                        putWithRetry(target, entry.key(), payload);
                         uploaded.incrementAndGet();
                         bytes.addAndGet(payload.length);
                     } catch (IOException e) {
@@ -214,6 +215,26 @@ public class StorageSync {
             }
         }
         return deleted;
+    }
+
+    private static void putWithRetry(StorageTarget target, String key, byte[] payload) throws IOException {
+        IOException last = null;
+        for (int attempt = 0; attempt < 4; attempt++) {
+            try {
+                target.put(key, payload, mediaType(key), cacheControl(key));
+                return;
+            } catch (IOException e) {
+                last = e;
+                try {
+                    Thread.sleep(250L << attempt);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw last;
+                }
+            }
+        }
+        ExportLog.warn("storage put failed after retries: {}", key);
+        throw last;
     }
 
     private static void joinAll(List<Future<?>> futures) throws IOException {

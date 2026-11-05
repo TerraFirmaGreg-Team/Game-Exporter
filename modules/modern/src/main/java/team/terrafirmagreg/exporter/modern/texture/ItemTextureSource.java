@@ -73,10 +73,7 @@ public final class ItemTextureSource extends ItemTextureSourceBase {
 
             @Override
             public List<String> list(String namespace, String path) {
-                return manager
-                        .listResources(path, loc -> loc.getNamespace().equals(namespace))
-                        .keySet()
-                        .stream()
+                return manager.listResources(path, loc -> loc.getNamespace().equals(namespace)).keySet().stream()
                         .map(ResourceLocation::getPath)
                         .toList();
             }

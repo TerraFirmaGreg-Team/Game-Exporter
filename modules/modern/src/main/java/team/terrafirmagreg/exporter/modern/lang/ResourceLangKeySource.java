@@ -20,8 +20,7 @@ public class ResourceLangKeySource {
         Set<String> keys = new TreeSet<>();
         for (String namespace : assets.getNamespaces()) {
             String path = "lang/" + language + ".json";
-            for (Resource layer :
-                    assets.getResourceStack(ResourceLocation.fromNamespaceAndPath(namespace, path))) {
+            for (Resource layer : assets.getResourceStack(ResourceLocation.fromNamespaceAndPath(namespace, path))) {
                 try (BufferedReader reader = layer.openAsReader()) {
                     keys.addAll(LangKeySource.jsonKeys(reader));
                 } catch (Exception e) {

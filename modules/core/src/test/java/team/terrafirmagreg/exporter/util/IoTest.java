@@ -47,8 +47,7 @@ class IoTest {
     @Test
     void keepsFirstLangKeyFreeOfBom() throws Exception {
         Map<String, Object> into = new LinkedHashMap<>();
-        LangMerge.mergeLangLines(
-                into, new BufferedReader(new StringReader(BOM + "key.a=One\nkey.b=Two\n")));
+        LangMerge.mergeLangLines(into, new BufferedReader(new StringReader(BOM + "key.a=One\nkey.b=Two\n")));
         assertEquals(Set.of("key.a", "key.b"), into.keySet());
     }
 
