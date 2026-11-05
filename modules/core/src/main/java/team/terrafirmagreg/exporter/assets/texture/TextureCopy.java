@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.List;
 import javax.imageio.ImageIO;
 import lombok.experimental.UtilityClass;
 import team.terrafirmagreg.exporter.contract.artifact.ArtifactAddress;
@@ -26,6 +27,10 @@ public class TextureCopy {
     @FunctionalInterface
     public interface ResourceReader {
         byte[] read(String location) throws IOException;
+
+        default List<String> list(String namespace, String path) {
+            return List.of();
+        }
     }
 
     public static CopyPlan planTextureCopy(ResourceReader assets, DumpLayout layout, String textureId) {

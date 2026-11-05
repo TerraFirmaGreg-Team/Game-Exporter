@@ -54,6 +54,32 @@ public class RecipeNormalize {
             }
             String role = captureRole(widget);
             if (!"text".equals(role)) {
+                if (("texture".equals(role) || "animated".equals(role))
+                        && widget.texture() != null
+                        && !widget.texture().isBlank()) {
+                    out.add(new RecipeWidget(
+                            role,
+                            widget.x(),
+                            widget.y(),
+                            widget.w(),
+                            widget.h(),
+                            null,
+                            widget.texture(),
+                            widget.u(),
+                            widget.v(),
+                            widget.regionW(),
+                            widget.regionH(),
+                            widget.time(),
+                            widget.horizontal(),
+                            widget.endToStart(),
+                            widget.fullToEmpty(),
+                            widget.textureW(),
+                            widget.textureH(),
+                            widget.tooltip(),
+                            widget.component(),
+                            widget.color(),
+                            widget.shadow()));
+                }
                 if (widget.tooltip().isEmpty()) {
                     continue;
                 }

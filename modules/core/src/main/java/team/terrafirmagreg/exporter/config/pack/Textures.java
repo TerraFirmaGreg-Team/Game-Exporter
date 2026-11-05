@@ -13,6 +13,7 @@ public final class Textures extends Filter {
     public ConfigValue<List<String>> fromComponents;
     public ConfigValue<List<String>> additionalMods;
     public ConfigValue<List<String>> include;
+    public ConfigValue<Boolean> gui;
     public ConfigValue<Integer> atlasMaxPageSize;
     public ConfigValue<Integer> iconSize;
 
@@ -23,6 +24,7 @@ public final class Textures extends Filter {
         fromComponents = cfg.value("fromComponents", TexturesComponentConfig.DEFAULT_FROM);
         additionalMods = cfg.value("additionalMods", List.of());
         include = cfg.value("include", List.of());
+        gui = cfg.value("gui", true);
         atlasMaxPageSize = cfg.value("atlasMaxPageSize", TexturesComponentConfig.DEFAULT_ATLAS_MAX_PAGE_SIZE)
                 .validate(v -> v != null && v > 0);
         iconSize = cfg.value("iconSize", TexturesComponentConfig.DEFAULT_ICON_SIZE)
@@ -40,6 +42,7 @@ public final class Textures extends Filter {
                         ProfileNormalize.normalizeFrom(fromComponents.get(), TexturesComponentConfig.DEFAULT_FROM)),
                 additionalMods.get(),
                 include.get(),
+                gui.get(),
                 atlasMaxPageSize.get(),
                 iconSize.get());
     }

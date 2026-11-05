@@ -1,5 +1,6 @@
 package team.terrafirmagreg.exporter.modern.texture;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -54,17 +55,30 @@ public final class ItemTextureSource extends ItemTextureSourceBase {
         if (manager == null) {
             return null;
         }
-        return location -> {
-            ResourceLocation loc = ResourceLocation.tryParse(location);
-            if (loc == null) {
-                return null;
+        return new TextureCopy.ResourceReader() {
+            @Override
+            public byte[] read(String location) throws IOException {
+                ResourceLocation loc = ResourceLocation.tryParse(location);
+                if (loc == null) {
+                    return null;
+                }
+                Optional<Resource> resource = manager.getResource(loc);
+                if (resource.isEmpty()) {
+                    return null;
+                }
+                try (InputStream in = resource.get().open()) {
+                    return in.readAllBytes();
+                }
             }
-            Optional<Resource> resource = manager.getResource(loc);
-            if (resource.isEmpty()) {
-                return null;
-            }
-            try (InputStream in = resource.get().open()) {
-                return in.readAllBytes();
+
+            @Override
+            public List<String> list(String namespace, String path) {
+                return manager
+                        .listResources(path, loc -> loc.getNamespace().equals(namespace))
+                        .keySet()
+                        .stream()
+                        .map(ResourceLocation::getPath)
+                        .toList();
             }
         };
     }

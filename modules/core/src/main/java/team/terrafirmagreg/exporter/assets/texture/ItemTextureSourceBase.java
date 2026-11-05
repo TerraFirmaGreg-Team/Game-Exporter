@@ -62,6 +62,18 @@ public abstract class ItemTextureSourceBase implements TextureSource {
         items.removeAll(fluids);
         Set<String> textures = new LinkedHashSet<>(filterIds(demand.textureIds(), effective));
         textures.addAll(input.options().include());
+        if (input.options().gui()) {
+            TextureCopy.ResourceReader reader = assets();
+            if (reader != null) {
+                for (String ns : effective) {
+                    for (String path : reader.list(ns, "textures/gui")) {
+                        if (path.endsWith(".png")) {
+                            textures.add(ns + ":" + path);
+                        }
+                    }
+                }
+            }
+        }
         List<AtlasSprite> early = new ArrayList<>();
         Set<String> already = new LinkedHashSet<>();
         for (AtlasSprite sprite : input.earlySprites()) {

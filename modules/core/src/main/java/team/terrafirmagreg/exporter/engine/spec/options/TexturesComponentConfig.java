@@ -11,6 +11,7 @@ public record TexturesComponentConfig(
         List<ComponentId> fromComponents,
         List<String> additionalMods,
         List<String> include,
+        boolean gui,
         int atlasMaxPageSize,
         int iconSize)
         implements ComponentOptions {
@@ -42,6 +43,7 @@ public record TexturesComponentConfig(
                 DEFAULT_FROM_IDS,
                 List.of(),
                 List.of(),
+                true,
                 DEFAULT_ATLAS_MAX_PAGE_SIZE,
                 DEFAULT_ICON_SIZE);
     }
