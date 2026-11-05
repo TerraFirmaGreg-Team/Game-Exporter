@@ -64,7 +64,7 @@ public final class ArtifactAddressRenderer {
 
     private static String modelPath(Asset asset) {
         String path = resourcePath(asset);
-        return path.startsWith("models/") ? path : "models/" + path;
+        return path.startsWith("models/") || path.startsWith("multiblock/") ? path : "models/" + path;
     }
 
     private static String resourcePath(Asset asset) {

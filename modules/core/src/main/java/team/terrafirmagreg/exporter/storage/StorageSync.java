@@ -30,8 +30,8 @@ public class StorageSync {
     public static final String OBJECTS_INDEX = "objects.json";
     private static final String CACHE_OBJECT = "public, max-age=31536000, immutable";
     private static final String CACHE_RESOLVER = "public, max-age=60";
-    private static final String CACHE_VERSIONED = "public, max-age=3600";
-    private static final int INDEX_PUTS = 2;
+    private static final String CACHE_VERSIONED = "public, max-age=31536000, immutable";
+    private static final int INDEX_PUTS = 3;
 
     public record Stats(int uploaded, int skipped, int deleted, long bytes) {}
 
@@ -97,9 +97,11 @@ public class StorageSync {
             joinAll(futures);
         }
         Map<String, String> indexView = new TreeMap<>(index);
+        byte[] indexBytes = DumpWriter.toJsonBytes(new ObjectsIndex(indexView));
+        target.put(segmentPrefix + OBJECTS_INDEX, indexBytes, "application/json", CACHE_VERSIONED);
         target.put(
-                segmentPrefix + OBJECTS_INDEX,
-                DumpWriter.toJsonBytes(new ObjectsIndex(indexView)),
+                segmentPrefix + OBJECTS_INDEX + ".gz",
+                gzip(indexBytes),
                 "application/json",
                 CACHE_VERSIONED);
         writeVersionsIndex(target, job);
@@ -207,6 +209,7 @@ public class StorageSync {
             }
         }
         planned.add(segmentPrefix + OBJECTS_INDEX);
+        planned.add(segmentPrefix + OBJECTS_INDEX + ".gz");
         int deleted = 0;
         for (String remote : target.listKeys(segmentPrefix)) {
             if (!planned.contains(remote)) {

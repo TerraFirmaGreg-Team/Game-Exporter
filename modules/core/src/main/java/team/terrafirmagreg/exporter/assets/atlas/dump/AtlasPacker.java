@@ -1,6 +1,5 @@
 package team.terrafirmagreg.exporter.assets.atlas.dump;
 
-import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import java.io.IOException;
@@ -71,7 +70,7 @@ public class AtlasPacker {
     }
 
     static Map<String, List<AtlasSprite>> itemSpriteMods(List<AtlasSprite> sprites) {
-        Map<String, List<AtlasSprite>> byMod = new Object2ObjectLinkedOpenHashMap<>();
+        Map<String, List<AtlasSprite>> byMod = new TreeMap<>();
         if (sprites == null) {
             return byMod;
         }

@@ -82,7 +82,7 @@ final class SceneGlbWrite {
                         String name = variant == 0 ? base : base + "~" + variant;
                         pending.add(new GuideMultiblocks.PendingGlb(
                                 layout.multiblock(parsed.namespace(), "recipe/" + name), mesh));
-                        rel = "assets/" + parsed.namespace() + "/models/multiblock/recipe/" + name + ".glb";
+                        rel = "assets/" + parsed.namespace() + "/multiblock/recipe/" + name + ".glb";
                         glbByContent.put(contentHash, rel);
                     }
                     def.put("glb", rel);

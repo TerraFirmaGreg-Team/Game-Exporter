@@ -197,7 +197,7 @@ public class GuideMultiblocks {
             GlbWriter.Mesh mesh =
                     tessellatePatchouli(mb, client.level, dispatcher, atlasImage.getWidth(), atlasImage.getHeight());
             Path out = layout.multiblock(rl.getNamespace(), rl.getPath());
-            String rel = "assets/" + rl.getNamespace() + "/models/multiblock/" + rl.getPath() + ".glb";
+            String rel = "assets/" + rl.getNamespace() + "/multiblock/" + rl.getPath() + ".glb";
             if (mesh.isEmpty()) {
                 ExportLog.warn("{} empty mesh", id);
             } else {
@@ -283,7 +283,7 @@ public class GuideMultiblocks {
         }
         String owner = bookModId == null || bookModId.isBlank() ? "minecraft" : bookModId;
         Path out = layout.inlineMultiblock(owner, sha);
-        String rel = "assets/" + owner + "/models/multiblock/inline/" + sha + ".glb";
+        String rel = "assets/" + owner + "/multiblock/inline/" + sha + ".glb";
         if (!mesh.isEmpty()) {
             pendingGlbs.add(new PendingGlb(out, mesh));
         }

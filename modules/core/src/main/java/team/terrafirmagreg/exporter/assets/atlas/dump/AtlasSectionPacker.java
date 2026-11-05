@@ -5,6 +5,7 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import lombok.experimental.UtilityClass;
@@ -27,7 +28,10 @@ class AtlasSectionPacker {
         }
 
         int size = cell > 0 ? cell : CELL;
-        List<PagePlan> plans = planPages(sprites.size(), size, maxAtlas);
+        List<AtlasSprite> ordered = sprites.stream()
+                .sorted(Comparator.comparing(AtlasSprite::id))
+                .toList();
+        List<PagePlan> plans = planPages(ordered.size(), size, maxAtlas);
         Map<String, AtlasSpriteRow> spriteMap = new Object2ObjectLinkedOpenHashMap<>();
         List<AtlasPage> pages = new ObjectArrayList<>();
         List<BufferedImage> sheets = new ObjectArrayList<>();
@@ -36,9 +40,9 @@ class AtlasSectionPacker {
         int pageIndex = 0;
         for (PagePlan plan : plans) {
             BufferedImage sheet = new BufferedImage(plan.cols * size, plan.rows * size, BufferedImage.TYPE_INT_ARGB);
-            int onPage = Math.min(sprites.size() - index, plan.cols * plan.rows);
+            int onPage = Math.min(ordered.size() - index, plan.cols * plan.rows);
             for (int i = 0; i < onPage; i++) {
-                AtlasSprite sprite = sprites.get(index + i);
+                AtlasSprite sprite = ordered.get(index + i);
                 BufferedImage img = sprite.image();
                 int col = i % plan.cols;
                 int row = i / plan.cols;

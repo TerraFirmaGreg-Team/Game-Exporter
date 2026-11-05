@@ -90,12 +90,16 @@ public class AssetPaths {
         return assets(layout, modId).resolve(MODELS);
     }
 
+    public static Path multiblocks(DumpLayout layout, String modId) {
+        return assets(layout, modId).resolve(MULTIBLOCK);
+    }
+
     public static Path multiblockModel(DumpLayout layout, String modId, String modelPath) {
         String path = DumpPaths.requireResourcePath(modelPath);
         if (!path.endsWith(".glb")) {
             path = path + ".glb";
         }
-        return DumpPaths.resolveUnder(models(layout, modId), MULTIBLOCK + "/" + path);
+        return DumpPaths.resolveUnder(multiblocks(layout, modId), path);
     }
 
     public static Path entityModel(DumpLayout layout, String modId, String modelPath) {
@@ -111,7 +115,7 @@ public class AssetPaths {
         if (hash.length() != 64) {
             throw new IllegalArgumentException("inline model hash must be full SHA-256 hex");
         }
-        return models(layout, modId).resolve(MULTIBLOCK).resolve(INLINE).resolve(hash + ".glb");
+        return multiblocks(layout, modId).resolve(INLINE).resolve(hash + ".glb");
     }
 
     private static Path textures(DumpLayout layout, String modId) {

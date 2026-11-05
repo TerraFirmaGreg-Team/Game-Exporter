@@ -60,7 +60,7 @@ public class DumpSchemas {
                 schema("registry/groups", GROUPS),
                 schema("data/recipes/recipe", RECIPES),
                 schema("registry/recipes", STRING_LIST_MAP),
-                schema("data/models/model", STRING_MAP),
+                schema("assets/models/model", STRING_MAP),
                 schema(QUEST_DATA, QuestBookData.class),
                 schema(QUEST_CHAPTER_GROUPS, QuestChapterGroups.class),
                 schema(QUEST_CHAPTER, QuestChapter.class),

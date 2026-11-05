@@ -5,7 +5,13 @@ import java.util.Objects;
 import java.util.Set;
 
 public record ComponentDefinition(
-        String id, Affinity affinity, int order, Set<OutputKey<?>> inputs, Set<OutputKey<?>> outputs, Action action) {
+        String id,
+        Affinity affinity,
+        int order,
+        Set<OutputKey<?>> inputs,
+        Set<OutputKey<?>> outputs,
+        Action action,
+        boolean clientFree) {
     public ComponentDefinition {
         if (id == null || id.isBlank()) {
             throw new IllegalArgumentException("Component id must not be blank");
@@ -14,6 +20,16 @@ public record ComponentDefinition(
         inputs = immutable(inputs);
         outputs = immutable(outputs);
         Objects.requireNonNull(action, "action");
+    }
+
+    public ComponentDefinition(
+            String id,
+            Affinity affinity,
+            int order,
+            Set<OutputKey<?>> inputs,
+            Set<OutputKey<?>> outputs,
+            Action action) {
+        this(id, affinity, order, inputs, outputs, action, false);
     }
 
     public ComponentDefinition(
@@ -41,6 +57,7 @@ public record ComponentDefinition(
         private final Set<OutputKey<?>> outputs = new LinkedHashSet<>();
         private Affinity affinity = Affinity.IO;
         private int order;
+        private boolean clientFree;
 
         private Builder(String id, Action action) {
             this.id = id;
@@ -67,8 +84,13 @@ public record ComponentDefinition(
             return this;
         }
 
+        public Builder clientFree() {
+            clientFree = true;
+            return this;
+        }
+
         public ComponentDefinition build() {
-            return new ComponentDefinition(id, affinity, order, inputs, outputs, action);
+            return new ComponentDefinition(id, affinity, order, inputs, outputs, action, clientFree);
         }
     }
 }

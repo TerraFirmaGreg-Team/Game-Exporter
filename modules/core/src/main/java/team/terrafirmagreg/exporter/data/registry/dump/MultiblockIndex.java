@@ -8,7 +8,6 @@ import java.util.TreeMap;
 import java.util.stream.Stream;
 import lombok.experimental.UtilityClass;
 import team.terrafirmagreg.exporter.dump.AssetPaths;
-import team.terrafirmagreg.exporter.dump.DataPaths;
 import team.terrafirmagreg.exporter.dump.DumpFiles;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
 import team.terrafirmagreg.exporter.dump.io.DumpWriter;
@@ -29,7 +28,7 @@ class MultiblockIndex {
     }
 
     private static void linkModModels(DumpLayout layout, String namespace) throws IOException {
-        Path multiblock = AssetPaths.models(layout, namespace).resolve("multiblock");
+        Path multiblock = AssetPaths.multiblocks(layout, namespace);
         if (!Files.isDirectory(multiblock)) {
             return;
         }
@@ -43,7 +42,7 @@ class MultiblockIndex {
                         .toString()
                         .replace('\\', '/')
                         .substring((namespace + "/").length());
-                String key = DumpFiles.stripExtension(rel.substring("models/multiblock/".length()));
+                String key = DumpFiles.stripExtension(rel.substring("multiblock/".length()));
                 if (key.startsWith("inline/")) {
                     key = key.substring("inline/".length());
                 }
@@ -53,7 +52,7 @@ class MultiblockIndex {
         if (models.isEmpty()) {
             return;
         }
-        Path out = DataPaths.data(layout, namespace).resolve("models").resolve("multiblock.json");
+        Path out = AssetPaths.models(layout, namespace).resolve("multiblock.json");
         Files.createDirectories(out.getParent());
         DumpWriter.writeJson(out, models);
     }
