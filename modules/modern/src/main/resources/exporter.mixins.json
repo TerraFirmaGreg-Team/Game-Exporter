@@ -17,6 +17,10 @@
         "EmiTextureWidgetAccessor",
         "EmiAnimatedTextureAccessor",
         "EmiTextWidgetAccessor",
+        "EmiRenderHelperMixin",
+        "EmiAgnosMixin",
+        "EmiListIngredientMixin",
+        "EmiGeneratedSlotMixin",
         "ClientTextTooltipAccessor"
     ],
     "refmap": "exporter.mixins.refmap.json",

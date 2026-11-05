@@ -3,6 +3,8 @@ package team.terrafirmagreg.exporter.modern.recipe;
 import com.mojang.blaze3d.platform.Window;
 import dev.emi.emi.EmiRenderHelper;
 import dev.emi.emi.api.recipe.EmiRecipe;
+import dev.emi.emi.api.widget.AnimatedTextureWidget;
+import dev.emi.emi.api.widget.Bounds;
 import dev.emi.emi.api.widget.SlotWidget;
 import dev.emi.emi.api.widget.TextWidget;
 import dev.emi.emi.api.widget.Widget;
@@ -16,6 +18,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.MultiBufferSource;
 import team.terrafirmagreg.exporter.assets.atlas.CaptureMetrics;
+import team.terrafirmagreg.exporter.modern.mixin.EmiTextureWidgetAccessor;
 import team.terrafirmagreg.exporter.modern.model.SceneCapture;
 import team.terrafirmagreg.exporter.modern.texture.CaptureScissor;
 import team.terrafirmagreg.exporter.modern.texture.OffScreenRenderer;
@@ -259,11 +262,15 @@ class EmiCardRender {
                             bounds.height(),
                             widget instanceof TextWidget);
                 }
-                widget.render(
-                        graphics,
-                        hideCursor ? OFF_SCREEN_CURSOR : neutralMouseX,
-                        hideCursor ? OFF_SCREEN_CURSOR : 8,
-                        0f);
+                if (widget instanceof AnimatedTextureWidget animated) {
+                    drawAnimatedStill(animated, bounds, graphics);
+                } else {
+                    widget.render(
+                            graphics,
+                            hideCursor ? OFF_SCREEN_CURSOR : neutralMouseX,
+                            hideCursor ? OFF_SCREEN_CURSOR : 8,
+                            0f);
+                }
             } catch (VirtualMachineError e) {
                 throw e;
             } catch (Throwable t) {
@@ -273,6 +280,23 @@ class EmiCardRender {
             }
         }
         SceneCapture.bakeUnrendered(graphics, EmiRecipeGui.MARGIN);
+    }
+
+    private static void drawAnimatedStill(AnimatedTextureWidget widget, Bounds bounds, GuiGraphics graphics) {
+        EmiTextureWidgetAccessor texture = (EmiTextureWidgetAccessor) widget;
+        EmiDrawContext.wrap(graphics)
+                .drawTexture(
+                        texture.gameExporter$texture(),
+                        bounds.x(),
+                        bounds.y(),
+                        bounds.width(),
+                        bounds.height(),
+                        texture.gameExporter$u(),
+                        texture.gameExporter$v(),
+                        texture.gameExporter$regionWidth(),
+                        texture.gameExporter$regionHeight(),
+                        texture.gameExporter$textureWidth(),
+                        texture.gameExporter$textureHeight());
     }
 
     static void verifyGrid(
