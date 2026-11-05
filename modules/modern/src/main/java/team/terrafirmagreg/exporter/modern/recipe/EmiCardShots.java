@@ -5,7 +5,6 @@ import dev.emi.emi.api.recipe.EmiRecipe;
 import dev.emi.emi.api.widget.Widget;
 import dev.emi.emi.config.EmiConfig;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -57,6 +56,8 @@ final class EmiCardShots implements AutoCloseable {
     private final ExportLog.WarnCap warnCap = ExportLog.warnCapped(10);
 
     private record CellSize(int w, int h) {}
+
+    private record CellGrid(int[] argb, int stride, boolean[] ok) {}
 
     private record PendingCard(
             String id,
@@ -184,9 +185,7 @@ final class EmiCardShots implements AutoCloseable {
             if (grid == null) {
                 keepScene(recipe, recipeId, card.scene(), dumpWidgets);
             }
-            CardScrub.stripOverflow(dumpWidgets, image.argb(), image.width(), image.height());
-            markEntitiesBaked(recipeId, image);
-            sink.accept(recipeId, categoryId(recipe), image);
+            sink.accept(recipeId, categoryId(recipe), deferred(image, dumpWidgets, recipeId));
             cardsQueued++;
             return new CardShot(EmiRecipeGui.MARGIN, image.width(), grid != null ? pageH : image.height());
         } catch (VirtualMachineError e) {
@@ -284,23 +283,23 @@ final class EmiCardShots implements AutoCloseable {
     }
 
     private void flushChunk(CellSize size, List<PendingCard> chunk, int cols, int rows) {
-        int[][] frame = renderCells(size, chunk, cols, rows);
+        CellGrid frame = renderCells(size, chunk, cols, rows);
         if (frame == null) {
             reshootAll(chunk);
             return;
         }
         for (int i = 0; i < chunk.size(); i++) {
-            if (frame[i] == null) {
+            if (!frame.ok()[i]) {
                 reshoot(chunk.get(i));
             } else {
-                accept(chunk.get(i), frame[i], size);
+                accept(chunk.get(i), frame, i, cols, size);
             }
         }
     }
 
     private void settleChunk(CellSize size, List<PendingCard> chunk, int cols, int rows) {
         long started = System.currentTimeMillis();
-        int[][] last = renderCells(size, chunk, cols, rows);
+        CellGrid last = renderCells(size, chunk, cols, rows);
         if (last == null) {
             reshootAll(chunk);
             return;
@@ -311,12 +310,12 @@ final class EmiCardShots implements AutoCloseable {
         boolean[] done = new boolean[n];
         int open = n;
         for (int i = 0; i < n; i++) {
-            if (last[i] == null) {
+            if (!last.ok()[i]) {
                 reshoot(chunk.get(i));
                 done[i] = true;
                 open--;
             } else {
-                hash[i] = Arrays.hashCode(last[i]);
+                hash[i] = cellHash(last, i, cols, size);
             }
         }
         long deadline = System.currentTimeMillis() + EmiRecipeGui.STABLE_WINDOW_MS;
@@ -329,26 +328,26 @@ final class EmiCardShots implements AutoCloseable {
             }
             stats.waits++;
             stats.settleRounds++;
-            int[][] frame = renderCells(size, chunk, cols, rows);
+            CellGrid frame = renderCells(size, chunk, cols, rows);
             if (frame == null) {
                 break;
             }
+            last = frame;
             for (int i = 0; i < n; i++) {
                 if (done[i]) {
                     continue;
                 }
-                if (frame[i] == null) {
+                if (!frame.ok()[i]) {
                     reshoot(chunk.get(i));
                     done[i] = true;
                     open--;
                     continue;
                 }
-                int h = Arrays.hashCode(frame[i]);
+                int h = cellHash(frame, i, cols, size);
                 stable[i] = h == hash[i] ? stable[i] + 1 : 0;
                 hash[i] = h;
-                last[i] = frame[i];
                 if (stable[i] >= EmiRecipeGui.STABLE_FRAMES) {
-                    accept(chunk.get(i), last[i], size);
+                    accept(chunk.get(i), frame, i, cols, size);
                     done[i] = true;
                     open--;
                 }
@@ -357,13 +356,13 @@ final class EmiCardShots implements AutoCloseable {
         for (int i = 0; i < n; i++) {
             if (!done[i]) {
                 stats.animated++;
-                accept(chunk.get(i), last[i], size);
+                accept(chunk.get(i), last, i, cols, size);
             }
         }
         stats.settleMs += System.currentTimeMillis() - started;
     }
 
-    private int[][] renderCells(CellSize size, List<PendingCard> chunk, int cols, int rows) {
+    private CellGrid renderCells(CellSize size, List<PendingCard> chunk, int cols, int rows) {
         int cellW = size.w();
         int cellH = size.h();
         int cellGuiW = 0;
@@ -403,26 +402,36 @@ final class EmiCardShots implements AutoCloseable {
                         chunk.get(i).dumpWidgets());
             }
         }
-        int gridW = cols * cellW;
-        int[][] out = new int[chunk.size()][];
-        for (int i = 0; i < chunk.size(); i++) {
-            if (!ok[i]) {
-                continue;
-            }
-            try {
-                out[i] = ArgbImage.crop(captured.argb(), gridW, (i % cols) * cellW, (i / cols) * cellH, cellW, cellH);
-            } catch (Throwable t) {
-                warnCap.warn("card grid cell {} crop failed: {}", chunk.get(i).id(), t.toString());
-            }
-        }
-        return out;
+        return new CellGrid(captured.argb(), cols * cellW, ok);
     }
 
-    private void accept(PendingCard card, int[] pixels, CellSize size) {
+    private static int cellHash(CellGrid frame, int index, int cols, CellSize size) {
+        int[] argb = frame.argb();
+        int x0 = (index % cols) * size.w();
+        int y0 = (index / cols) * size.h();
+        int hash = 1;
+        for (int y = y0; y < y0 + size.h(); y++) {
+            int offset = y * frame.stride() + x0;
+            for (int x = 0; x < size.w(); x++) {
+                hash = 31 * hash + argb[offset + x];
+            }
+        }
+        return hash;
+    }
+
+    private void accept(PendingCard card, CellGrid frame, int index, int cols, CellSize size) {
+        int x = (index % cols) * size.w();
+        int y = (index / cols) * size.h();
+        List<team.terrafirmagreg.exporter.data.recipe.capture.CardWidget> widgets = card.dumpWidgets();
+        Map<String, Object> extra = sceneExtras.get(card.id());
+        int scale = EmiRecipeGui.guiScale();
+        RecipeCardImage image = new RecipeCardImage(frame.argb(), size.w(), size.h(), raw -> {
+            int[] pixels = ArgbImage.crop(raw.argb(), frame.stride(), x, y, size.w(), size.h());
+            CardScrub.stripOverflow(widgets, pixels, size.w(), size.h(), scale);
+            EntityBakedCheck.verify(extra, pixels, size.w(), size.h(), scale);
+            return new RecipeCardImage(pixels, size.w(), size.h());
+        });
         try {
-            CardScrub.stripOverflow(card.dumpWidgets(), pixels, size.w(), size.h());
-            RecipeCardImage image = new RecipeCardImage(pixels, size.w(), size.h());
-            markEntitiesBaked(card.id(), image);
             sink.accept(card.id(), categoryId(card.recipe()), image);
             cardsQueued++;
         } catch (Throwable t) {
@@ -454,10 +463,8 @@ final class EmiCardShots implements AutoCloseable {
             if (card.grid() == null) {
                 keepScene(card.recipe(), card.id(), captured.scene(), card.dumpWidgets());
             }
-            RecipeCardImage image = captured.image();
-            CardScrub.stripOverflow(card.dumpWidgets(), image.argb(), image.width(), image.height());
-            markEntitiesBaked(card.id(), image);
-            sink.accept(card.id(), categoryId(card.recipe()), image);
+            sink.accept(
+                    card.id(), categoryId(card.recipe()), deferred(captured.image(), card.dumpWidgets(), card.id()));
             cardsQueued++;
         } catch (Throwable t) {
             imageFailures++;
@@ -466,8 +473,17 @@ final class EmiCardShots implements AutoCloseable {
         }
     }
 
-    private void markEntitiesBaked(String recipeId, RecipeCardImage image) {
-        EntityBakedCheck.verify(sceneExtras.get(recipeId), image.argb(), image.width(), image.height());
+    private RecipeCardImage deferred(
+            RecipeCardImage image,
+            List<team.terrafirmagreg.exporter.data.recipe.capture.CardWidget> dumpWidgets,
+            String recipeId) {
+        Map<String, Object> extra = sceneExtras.get(recipeId);
+        int scale = EmiRecipeGui.guiScale();
+        return image.withPrep(raw -> {
+            CardScrub.stripOverflow(dumpWidgets, raw.argb(), raw.width(), raw.height(), scale);
+            EntityBakedCheck.verify(extra, raw.argb(), raw.width(), raw.height(), scale);
+            return raw;
+        });
     }
 
     @Override

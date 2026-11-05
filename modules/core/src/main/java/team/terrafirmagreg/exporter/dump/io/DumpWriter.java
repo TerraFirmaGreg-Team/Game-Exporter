@@ -25,9 +25,14 @@ public class DumpWriter {
     private static final JsonMapper CANONICAL_PRETTY = createMapper(true, true);
     private static final JsonMapper HASH_COMPACT = createMapper(false, false);
     private static final JsonMapper GAME_READ = createGameReadMapper();
+    private static volatile boolean prettyWrites;
+
+    public static void preferPrettyJson(boolean pretty) {
+        prettyWrites = pretty;
+    }
 
     public static ObjectMapper mapper() {
-        return CANONICAL_COMPACT;
+        return prettyWrites ? CANONICAL_PRETTY : CANONICAL_COMPACT;
     }
 
     public static ObjectMapper compactMapper() {

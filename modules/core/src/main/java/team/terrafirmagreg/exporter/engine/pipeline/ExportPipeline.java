@@ -8,10 +8,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import team.terrafirmagreg.exporter.contract.dto.manifest.DumpManifest;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
 import team.terrafirmagreg.exporter.dump.document.ManifestDump;
-import team.terrafirmagreg.exporter.dump.io.PrettyJsonPass;
+import team.terrafirmagreg.exporter.dump.io.DumpWriter;
 import team.terrafirmagreg.exporter.dump.transaction.DumpTransaction;
 import team.terrafirmagreg.exporter.engine.output.ComponentOutcome;
 import team.terrafirmagreg.exporter.engine.output.LinkPayload;
@@ -21,6 +23,7 @@ import team.terrafirmagreg.exporter.engine.plan.ExecutionOutputs;
 import team.terrafirmagreg.exporter.engine.plan.ExecutionPlan;
 import team.terrafirmagreg.exporter.engine.plan.ExecutionPlanner;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
+import team.terrafirmagreg.exporter.engine.run.RunTasks;
 import team.terrafirmagreg.exporter.engine.spec.ComponentId;
 import team.terrafirmagreg.exporter.engine.spec.ExportSpec;
 import team.terrafirmagreg.exporter.storage.StoragePublish;
@@ -31,7 +34,7 @@ public final class ExportPipeline {
     private final String minecraftVersion;
     private final List<ExportTask> components = new ArrayList<>();
     private final ThreadLocal<Map<String, Long>> completedMetrics = ThreadLocal.withInitial(Map::of);
-    private IndexCommit indexCommit = (layout, payload) -> Map.of();
+    private IndexCommit indexCommit = (layout, payload, scope) -> Map.of();
 
     public ExportPipeline(String platform, String minecraftVersion) {
         this.platform = platform;
@@ -65,12 +68,19 @@ public final class ExportPipeline {
         Map<ComponentId, ExportTask> byId = componentsById();
         try (DumpTransaction transaction = DumpTransaction.open(dest);
                 RunScope scope = new RunScope()) {
-            DumpLayout layout = transaction.layout();
-            ExecutionPlan plan = new ExecutionPlanner().plan(PipelineRegistry.registry(request, layout, byId));
-            DependencyScheduler.Result run = new DependencyScheduler().run(plan, scope);
-            run.report().componentMs().forEach((id, elapsed) -> scope.metrics().record(id + "Ms", elapsed));
-            Map<ComponentId, ComponentOutcome> results = outcomes(request.resolvedComponents(), run.outputs());
-            commit(request, transaction, scope, layout, results);
+            DumpWriter.preferPrettyJson(request.prettyJson());
+            try {
+                DumpLayout layout = transaction.layout();
+                ExecutionPlan plan = new ExecutionPlanner().plan(PipelineRegistry.registry(request, layout, byId));
+                DependencyScheduler.Result run = new DependencyScheduler().run(plan, scope);
+                run.report()
+                        .componentMs()
+                        .forEach((id, elapsed) -> scope.metrics().record(id + "Ms", elapsed));
+                Map<ComponentId, ComponentOutcome> results = outcomes(request.resolvedComponents(), run.outputs());
+                commit(request, transaction, scope, layout, results);
+            } finally {
+                DumpWriter.preferPrettyJson(false);
+            }
             publish(request, transaction, scope);
             completedMetrics.set(scope.metrics().timings());
             return dest;
@@ -114,9 +124,19 @@ public final class ExportPipeline {
                         scope.tasks().pendingCount());
         scope.tasks().drain();
         Map<String, Set<String>> registryKinds = Map.of();
+        CompletableFuture<LinkPayload> payload = scope.tasks().supply(() -> {
+            long startNs = System.nanoTime();
+            try {
+                return LinkPayload.merged(results);
+            } finally {
+                scope.metrics().record("payloadMergeMs", TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNs));
+            }
+        });
+        LinkPayload merged;
         try (ExportLog.Phase _ = ExportLog.phase(scope.metrics(), "commit")) {
             PipelineCommit.content(transaction, results, scope);
-            registryKinds = indexCommit.apply(layout, LinkPayload.merged(results));
+            merged = RunTasks.await(payload);
+            registryKinds = indexCommit.apply(layout, merged, scope);
         }
         transaction.contentCommitted();
         DumpManifest manifest;
@@ -127,6 +147,7 @@ public final class ExportPipeline {
                     request.minecraftVersion(),
                     request,
                     results,
+                    merged,
                     transaction.catalog(),
                     scope,
                     transaction.generationId(),
@@ -136,11 +157,6 @@ public final class ExportPipeline {
         transaction.supportingCommitted();
         scope.metrics().record("catalogSize", transaction.catalog().size());
         transaction.finalizeManifest(manifest);
-        if (request.prettyJson()) {
-            try (ExportLog.Phase _ = ExportLog.phase(scope.metrics(), "prettyJson")) {
-                PrettyJsonPass.run(layout.root(), scope);
-            }
-        }
     }
 
     private void publish(ExportSpec request, DumpTransaction transaction, RunScope scope) throws IOException {

@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import lombok.experimental.UtilityClass;
 import team.terrafirmagreg.exporter.contract.artifact.ArtifactAddress;
 import team.terrafirmagreg.exporter.contract.artifact.ArtifactCatalog;
@@ -15,6 +16,7 @@ import team.terrafirmagreg.exporter.contract.dto.manifest.RecipeTypeRow;
 import team.terrafirmagreg.exporter.contract.dto.manifest.RecipeTypesIndex;
 import team.terrafirmagreg.exporter.contract.dto.meta.ComponentRow;
 import team.terrafirmagreg.exporter.contract.dto.meta.DumpReport;
+import team.terrafirmagreg.exporter.contract.dto.meta.ReportFiles;
 import team.terrafirmagreg.exporter.contract.dto.meta.Selection;
 import team.terrafirmagreg.exporter.contract.dto.meta.TimingEntry;
 import team.terrafirmagreg.exporter.contract.dto.recipe.RecipeEntry;
@@ -33,6 +35,7 @@ import team.terrafirmagreg.exporter.engine.output.ComponentOutcome;
 import team.terrafirmagreg.exporter.engine.output.ComponentOutcome.Status;
 import team.terrafirmagreg.exporter.engine.output.LinkPayload;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
+import team.terrafirmagreg.exporter.engine.run.RunTasks;
 import team.terrafirmagreg.exporter.engine.spec.ComponentId;
 import team.terrafirmagreg.exporter.engine.spec.ExportSpec;
 import team.terrafirmagreg.exporter.engine.spec.ProductId;
@@ -50,6 +53,7 @@ public class ManifestDump {
             String minecraftVersion,
             ExportSpec request,
             Map<ComponentId, ComponentOutcome> results,
+            LinkPayload payload,
             ArtifactCatalog catalog,
             RunScope session,
             String generation,
@@ -57,26 +61,91 @@ public class ManifestDump {
             throws IOException {
         RunMetrics metrics = new RunMetrics();
         RunMetrics.Stopwatch total = metrics.start("total");
-        LinkPayload payload = LinkPayload.merged(results);
-        Set<String> groupNamespaces = GroupsDump.byNamespace(payload).keySet();
-        RecipeScan recipeScan = recipeScan(payload);
+        RunTasks tasks = session == null ? null : session.tasks();
         Map<String, String> modKeys = modDisplayKeys(results);
-        CatalogProjection projection = new CatalogProjection(
-                catalog,
-                request.languages(),
-                recipeScan.categories(),
-                groupNamespaces,
-                registryKinds,
-                payload.namespaceLanguages(),
-                payload.keybindNamespaces());
         RunMetrics.Stopwatch manifests = metrics.start("manifests");
-        writeRecipeIndexes(layout, projection.recipeIndexes());
-        SchemaDump.write(layout);
-        DumpIndexes indexes = new DumpIndexes(recipeScan.types(), questPointers(layout, catalog), usedContent(payload));
+        CompletableFuture<Set<String>> groupNamespaces =
+                supply(tasks, () -> GroupsDump.byNamespace(payload).keySet());
+        CompletableFuture<RecipeScan> scan = supply(tasks, () -> recipeScan(payload));
+        CompletableFuture<List<String>> used = supply(tasks, () -> usedContent(payload));
+        CompletableFuture<Map<String, String>> quests = supply(tasks, () -> questPointers(layout, catalog));
+        CompletableFuture<Void> schemas = supply(tasks, () -> {
+            SchemaDump.write(layout);
+            return null;
+        });
+        CompletableFuture<CatalogProjection> projection = supply(
+                tasks,
+                () -> new CatalogProjection(
+                        catalog,
+                        request.languages(),
+                        RunTasks.await(scan).categories(),
+                        RunTasks.await(groupNamespaces),
+                        registryKinds,
+                        payload.namespaceLanguages(),
+                        payload.keybindNamespaces()));
+        CompletableFuture<Void> recipeIndex = supply(tasks, () -> {
+            writeRecipeIndexes(layout, RunTasks.await(projection).recipeIndexes());
+            return null;
+        });
+        CompletableFuture<ReportFiles> stats = supply(tasks, () -> {
+            RunTasks.await(schemas);
+            RunTasks.await(recipeIndex);
+            return ReportFileStats.of(layout.root());
+        });
+        CompletableFuture<Void> report = supply(tasks, () -> {
+            writeReport(layout, request, results, session, generation, RunTasks.await(stats));
+            return null;
+        });
+        DumpIndexes indexes =
+                new DumpIndexes(RunTasks.await(scan).types(), RunTasks.await(quests), RunTasks.await(used));
+        CatalogProjection projected = RunTasks.await(projection);
+        RunTasks.await(report);
         manifests.stop();
         RunMetrics.Stopwatch root = metrics.start("root");
-        Map<String, ComponentRow> components = components(request, results);
         DumpProducer producer = new DumpProducer("game-exporter", platform, minecraftVersion);
+        DumpManifest rootManifest = new DumpManifest(
+                DumpLayout.SCHEMA_DUMP,
+                DumpLayout.LAYOUT,
+                producer,
+                request.pack(),
+                projected.languages(),
+                namespaces(projected.catalogs(), modKeys),
+                indexes);
+        root.stop();
+        total.stop();
+        LOG.info(
+                "writeAllMs={} manifestsMs={} rootManifestMs={} assetMods={} dataMods={}",
+                metrics.timings().get("total"),
+                metrics.timings().get("manifests"),
+                metrics.timings().get("root"),
+                projected.assetMods(),
+                projected.dataMods());
+        if (tasks != null) {
+            tasks.drain();
+        }
+        return rootManifest;
+    }
+
+    private static <T> CompletableFuture<T> supply(RunTasks tasks, RunTasks.ThrowingSupplier<T> work) {
+        if (tasks != null) {
+            return tasks.supply(work);
+        }
+        try {
+            return CompletableFuture.completedFuture(work.get());
+        } catch (Exception e) {
+            return CompletableFuture.failedFuture(e);
+        }
+    }
+
+    private static void writeReport(
+            DumpLayout layout,
+            ExportSpec request,
+            Map<ComponentId, ComponentOutcome> results,
+            RunScope session,
+            String generation,
+            ReportFiles files)
+            throws IOException {
+        Map<String, ComponentRow> components = components(request, results);
         Map<String, TimingEntry> timings = new TreeMap<>();
         Map<String, Long> counters = new TreeMap<>();
         Map<String, Long> sessionMetrics =
@@ -99,25 +168,7 @@ public class ManifestDump {
                         components,
                         timings,
                         counters,
-                        ReportFileStats.of(layout.root())));
-        DumpManifest rootManifest = new DumpManifest(
-                DumpLayout.SCHEMA_DUMP,
-                DumpLayout.LAYOUT,
-                producer,
-                request.pack(),
-                projection.languages(),
-                namespaces(projection.catalogs(), modKeys),
-                indexes);
-        root.stop();
-        total.stop();
-        LOG.info(
-                "writeAllMs={} manifestsMs={} rootManifestMs={} assetMods={} dataMods={}",
-                metrics.timings().get("total"),
-                metrics.timings().get("manifests"),
-                metrics.timings().get("root"),
-                projection.assetMods(),
-                projection.dataMods());
-        return rootManifest;
+                        files));
     }
 
     private static Map<String, NamespaceDisplay> namespaces(

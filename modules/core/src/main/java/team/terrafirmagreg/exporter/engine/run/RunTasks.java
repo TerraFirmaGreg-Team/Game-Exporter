@@ -29,6 +29,55 @@ public final class RunTasks implements AutoCloseable {
         return submitter.submit(task);
     }
 
+    public <T> CompletableFuture<T> supply(ThrowingSupplier<T> task) {
+        CompletableFuture<T> out = new CompletableFuture<>();
+        submit(() -> {
+            try {
+                out.complete(task.get());
+            } catch (Throwable t) {
+                out.completeExceptionally(t);
+            }
+        });
+        return out;
+    }
+
+    public CompletableFuture<Void> run(ThrowingRunnable task) {
+        return supply(() -> {
+            task.run();
+            return null;
+        });
+    }
+
+    public <T> CompletableFuture<T> supplyImage(ThrowingSupplier<T> task) {
+        CompletableFuture<T> out = new CompletableFuture<>();
+        submitImage(() -> {
+            try {
+                out.complete(task.get());
+            } catch (Throwable t) {
+                out.completeExceptionally(t);
+            }
+        });
+        return out;
+    }
+
+    public static <T> T await(CompletableFuture<T> future) throws IOException {
+        try {
+            return future.join();
+        } catch (CompletionException e) {
+            Throwable cause = e.getCause() == null ? e : e.getCause();
+            if (cause instanceof IOException io) {
+                throw io;
+            }
+            if (cause instanceof RuntimeException runtime) {
+                throw runtime;
+            }
+            if (cause instanceof Error error) {
+                throw error;
+            }
+            throw new IOException("Run task failed", cause);
+        }
+    }
+
     public Future<?> submitImage(ThrowingRunnable task) {
         return submitter.submitImage(task);
     }
@@ -79,6 +128,11 @@ public final class RunTasks implements AutoCloseable {
     @FunctionalInterface
     public interface ThrowingRunnable {
         void run() throws Exception;
+    }
+
+    @FunctionalInterface
+    public interface ThrowingSupplier<T> {
+        T get() throws Exception;
     }
 
     @FunctionalInterface

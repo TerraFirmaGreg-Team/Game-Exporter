@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.CompletableFuture;
 import lombok.experimental.UtilityClass;
 import team.terrafirmagreg.exporter.contract.dto.entry.RegistryRow;
 import team.terrafirmagreg.exporter.contract.dto.group.StackGroupValue;
@@ -19,30 +20,48 @@ import team.terrafirmagreg.exporter.dump.DataPaths;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
 import team.terrafirmagreg.exporter.dump.io.DumpWriter;
 import team.terrafirmagreg.exporter.engine.output.LinkPayload;
+import team.terrafirmagreg.exporter.engine.run.RunScope;
+import team.terrafirmagreg.exporter.engine.run.RunTasks;
 import tools.jackson.databind.node.ObjectNode;
 
 @UtilityClass
 class RegistryWrites {
 
-    static Map<String, ObjectNode> entryRoots(LinkPayload payload) {
+    private static final List<EntryKind> KINDS =
+            List.of(EntryKind.ITEM, EntryKind.BLOCK, EntryKind.FLUID, EntryKind.ENTITY);
+
+    static Map<String, ObjectNode> entryRoots(LinkPayload payload, RunScope scope) throws IOException {
+        Map<String, CompletableFuture<ObjectNode>> futures = new LinkedHashMap<>();
+        for (EntryKind kind : KINDS) {
+            futures.put(kind.folder(), scope.tasks().supply(() -> kindRoot(rowsOf(payload, kind))));
+        }
         Map<String, ObjectNode> roots = new LinkedHashMap<>();
-        putEntries(roots, EntryKind.ITEM, payload.items());
-        putEntries(roots, EntryKind.BLOCK, payload.blocks());
-        putEntries(roots, EntryKind.FLUID, payload.fluids());
-        putEntries(roots, EntryKind.ENTITY, payload.entities());
+        for (Map.Entry<String, CompletableFuture<ObjectNode>> entry : futures.entrySet()) {
+            ObjectNode root = RunTasks.await(entry.getValue());
+            if (root != null) {
+                roots.put(entry.getKey(), root);
+            }
+        }
         return roots;
     }
 
-    private static void putEntries(Map<String, ObjectNode> roots, EntryKind kind, List<? extends RegistryRow> rows) {
+    private static List<? extends RegistryRow> rowsOf(LinkPayload payload, EntryKind kind) {
+        return switch (kind) {
+            case ITEM -> payload.items();
+            case BLOCK -> payload.blocks();
+            case FLUID -> payload.fluids();
+            case ENTITY -> payload.entities();
+        };
+    }
+
+    private static ObjectNode kindRoot(List<? extends RegistryRow> rows) {
         Map<String, RegistryRow> merged = new TreeMap<>();
         for (RegistryRow row : rows) {
             if (row != null && row.id() != null && !row.id().isBlank()) {
                 merged.putIfAbsent(row.id(), row);
             }
         }
-        if (!merged.isEmpty()) {
-            roots.put(kind.folder(), (ObjectNode) DumpWriter.mapper().valueToTree(merged));
-        }
+        return merged.isEmpty() ? null : (ObjectNode) DumpWriter.mapper().valueToTree(merged);
     }
 
     static void writeTabs(DumpLayout layout, LinkPayload payload) throws IOException {

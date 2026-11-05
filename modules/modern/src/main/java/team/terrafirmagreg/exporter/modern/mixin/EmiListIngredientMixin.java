@@ -13,12 +13,8 @@ import team.terrafirmagreg.exporter.modern.model.SceneCapture;
 @Mixin(value = ListEmiIngredient.class, remap = false)
 public abstract class EmiListIngredientMixin {
 
-    @Inject(
-            method = "render(Lnet/minecraft/client/gui/GuiGraphics;IIFI)V",
-            at = @At("HEAD"),
-            cancellable = true)
-    private void gameExporter$pinFirst(
-            GuiGraphics draw, int x, int y, float delta, int flags, CallbackInfo ci) {
+    @Inject(method = "render(Lnet/minecraft/client/gui/GuiGraphics;IIFI)V", at = @At("HEAD"), cancellable = true)
+    private void gameExporter$pinFirst(GuiGraphics draw, int x, int y, float delta, int flags, CallbackInfo ci) {
         if (!SceneCapture.suppressed()) {
             return;
         }

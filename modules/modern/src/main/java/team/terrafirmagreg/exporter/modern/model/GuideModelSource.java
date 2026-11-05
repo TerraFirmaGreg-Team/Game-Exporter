@@ -60,9 +60,7 @@ public final class GuideModelSource implements ModelSource {
                             ArtifactAddress.AssetKind.MODEL);
                 } else if (path.startsWith("multiblock/")) {
                     address = new ArtifactAddress.Asset(
-                            namespace,
-                            namespace + ":" + path,
-                            ArtifactAddress.AssetKind.MODEL);
+                            namespace, namespace + ":" + path, ArtifactAddress.AssetKind.MODEL);
                 } else if (path.startsWith("atlases/") && path.endsWith(".json")) {
                     address = new ArtifactAddress.Asset(
                             namespace,

@@ -6,6 +6,7 @@ import dev.emi.emi.api.recipe.EmiRecipeManager;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -128,9 +129,15 @@ class EmiCardPipe {
             Semaphore gate = window;
             Consumed consumed = onRenderThread(client, scope, () -> consume(list, channel, gate, shots, scope, prep));
             Map<String, String> imageSrcs = sink == null ? Map.of() : sink.imageSrcs();
-            if (consumed.shots() != null && !consumed.shots().failedCards().isEmpty()) {
-                EmiCardPatcher.failedImages(
-                        consumed.captures(), consumed.shots().failedCards());
+            Set<String> failedCards = new HashSet<>();
+            if (sink != null) {
+                failedCards.addAll(sink.failedCards());
+            }
+            if (consumed.shots() != null) {
+                failedCards.addAll(consumed.shots().failedCards());
+            }
+            if (!failedCards.isEmpty()) {
+                EmiCardPatcher.failedImages(consumed.captures(), failedCards);
             }
             if (consumed.shots() != null && !consumed.shots().multiblocks().isEmpty()) {
                 EmiCardPatcher.multiblocks(consumed.captures(), consumed.shots().multiblocks());

@@ -10,7 +10,7 @@ class CardScrub {
     private static final int STRIP_BAR_EXTRA_GUI = 16;
     private static final int PANEL_FALLBACK_ARGB = 0xFFC6C6C6;
 
-    static void stripOverflow(List<CardWidget> dumpWidgets, int[] argb, int w, int h) {
+    static void stripOverflow(List<CardWidget> dumpWidgets, int[] argb, int w, int h, int scale) {
         if (dumpWidgets == null || argb == null) {
             return;
         }
@@ -28,7 +28,6 @@ class CardScrub {
         if (top == Integer.MAX_VALUE) {
             return;
         }
-        int scale = EmiRecipeGui.guiScale();
         int marginPx = EmiRecipeGui.MARGIN * scale;
         int contentGuiW = w / scale - EmiRecipeGui.MARGIN * 2;
         if (right <= contentGuiW + 1) {

@@ -195,6 +195,9 @@ public final class RecipeComponent implements ExportTask, NodeContributor {
             diagnostics.addAll(snapshot.diagnostics());
             demand = demand.merge(snapshot.demand());
         }
+        if (cards != null) {
+            cards.resolve();
+        }
         scope.metrics().record("recipeCardsQueued", cards == null ? 0 : cards.queued());
         return new RecipeSnapshot(recipes, layouts, demand, diagnostics, categoryIcons);
     }

@@ -20,10 +20,7 @@ public abstract class EmiGeneratedSlotMixin {
     @Shadow
     private int unique;
 
-    @Inject(
-            method = "getStack",
-            at = @At("HEAD"),
-            cancellable = true)
+    @Inject(method = "getStack", at = @At("HEAD"), cancellable = true)
     private void gameExporter$pinStack(CallbackInfoReturnable<EmiIngredient> cir) {
         if (SceneCapture.suppressed()) {
             cir.setReturnValue(stackSupplier.apply(new Random(new Random(unique).nextInt())));

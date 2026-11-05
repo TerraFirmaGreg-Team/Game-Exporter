@@ -14,12 +14,11 @@ class EntityBakedCheck {
     private static final int ENTITY_FRAME_INSET_PX = 4;
     private static final int ENTITY_CLIP_PAD_GUI = 6;
 
-    static Set<String> verify(Map<String, Object> extra, int[] argb, int w, int h) {
+    static Set<String> verify(Map<String, Object> extra, int[] argb, int w, int h, int scale) {
         if (extra == null || argb == null || !(extra.get("entities") instanceof List<?> rows)) {
             return Set.of();
         }
         Set<String> missing = new HashSet<>();
-        int scale = EmiRecipeGui.guiScale();
         for (Object row : rows) {
             if (!(row instanceof Map<?, ?> map)
                     || !(map.get("x") instanceof Number x

@@ -28,9 +28,8 @@ class AtlasSectionPacker {
         }
 
         int size = cell > 0 ? cell : CELL;
-        List<AtlasSprite> ordered = sprites.stream()
-                .sorted(Comparator.comparing(AtlasSprite::id))
-                .toList();
+        List<AtlasSprite> ordered =
+                sprites.stream().sorted(Comparator.comparing(AtlasSprite::id)).toList();
         List<PagePlan> plans = planPages(ordered.size(), size, maxAtlas);
         Map<String, AtlasSpriteRow> spriteMap = new Object2ObjectLinkedOpenHashMap<>();
         List<AtlasPage> pages = new ObjectArrayList<>();
