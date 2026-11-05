@@ -20,7 +20,7 @@ class DumpSchemasTest {
             "registry/recipe_categories",
             "registry/groups",
             "registry/recipes",
-            "data/models/model",
+            "assets/models/model",
             "data/recipes/recipe",
             "data/quests/data",
             "data/quests/chapter_groups",
