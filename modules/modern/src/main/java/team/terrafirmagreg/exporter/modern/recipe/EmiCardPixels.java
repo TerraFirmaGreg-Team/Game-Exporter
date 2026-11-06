@@ -6,9 +6,29 @@ import lombok.experimental.UtilityClass;
 @UtilityClass
 class EmiCardPixels {
     static final double MIN_NON_BACKGROUND = 0.05;
+    private static final int SAMPLE_TARGET = 16_384;
 
     static boolean mostlyBackground(int[] argb) {
         return nonBackgroundFraction(argb) < MIN_NON_BACKGROUND;
+    }
+
+    static double sampledNonBackground(int[] argb, int stride, int x, int y, int w, int h) {
+        if (argb == null || w <= 0 || h <= 0) {
+            return 1.0;
+        }
+        int step = Math.max(1, (int) Math.sqrt((double) w * h / SAMPLE_TARGET));
+        Int2IntOpenHashMap counts = new Int2IntOpenHashMap();
+        int dominant = 0;
+        int total = 0;
+        for (int row = y; row < y + h; row += step) {
+            int offset = row * stride + x;
+            for (int col = 0; col < w; col += step) {
+                int seen = counts.addTo(argb[offset + col], 1) + 1;
+                dominant = Math.max(dominant, seen);
+                total++;
+            }
+        }
+        return total == 0 ? 1.0 : 1.0 - (double) dominant / total;
     }
 
     static double nonBackgroundFraction(int[] argb) {

@@ -17,6 +17,7 @@ import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraftforge.fml.ModList;
 import team.terrafirmagreg.exporter.data.guide.GuideBookPaths;
 import team.terrafirmagreg.exporter.data.guide.GuideBookSourceBase;
+import team.terrafirmagreg.exporter.engine.run.RunScope;
 import team.terrafirmagreg.exporter.modern.lang.ResourceLangKeySource;
 import vazkii.patchouli.api.PatchouliAPI;
 
@@ -42,8 +43,8 @@ public final class PatchouliSource extends GuideBookSourceBase {
     }
 
     @Override
-    protected Set<String> resourceLangKeys(String lang) {
-        return client == null ? Set.of() : ResourceLangKeySource.capture(client.getResourceManager(), lang);
+    protected Set<String> resourceLangKeys(String lang, RunScope scope) {
+        return client == null ? Set.of() : ResourceLangKeySource.capture(client.getResourceManager(), lang, scope);
     }
 
     @Override

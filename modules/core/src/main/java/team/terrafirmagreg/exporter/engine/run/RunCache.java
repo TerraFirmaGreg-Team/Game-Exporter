@@ -54,16 +54,5 @@ public final class RunCache {
         T get() throws Exception;
     }
 
-    private record Key(Object owner, Class<?> type) {
-
-        @Override
-        public boolean equals(Object other) {
-            return other instanceof Key key && owner == key.owner && type == key.type;
-        }
-
-        @Override
-        public int hashCode() {
-            return 31 * System.identityHashCode(owner) + System.identityHashCode(type);
-        }
-    }
+    private record Key(Object owner, Class<?> type) {}
 }

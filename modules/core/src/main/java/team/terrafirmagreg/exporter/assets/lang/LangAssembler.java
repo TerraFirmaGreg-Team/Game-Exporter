@@ -10,6 +10,7 @@ import java.util.TreeMap;
 import lombok.experimental.UtilityClass;
 import team.terrafirmagreg.exporter.contract.text.DisplayFill;
 import team.terrafirmagreg.exporter.contract.text.DumpTextFormat;
+import team.terrafirmagreg.exporter.engine.run.RunScope;
 import team.terrafirmagreg.exporter.engine.spec.options.ModIdFilter;
 
 @UtilityClass
@@ -17,12 +18,18 @@ public class LangAssembler {
 
     public static LangSnapshot assemble(Path gameDir, String lang, List<LangSource> sources, ModIdFilter modFilter)
             throws IOException {
+        return assemble(gameDir, lang, sources, modFilter, null);
+    }
+
+    public static LangSnapshot assemble(
+            Path gameDir, String lang, List<LangSource> sources, ModIdFilter modFilter, RunScope scope)
+            throws IOException {
         ModIdFilter filter = modFilter == null ? ModIdFilter.allowAll() : modFilter;
         List<LangSource> live = sources == null ? List.of() : sources;
         LangSnapshot snapshot = LangSnapshot.empty();
         for (LangSource source : live) {
             if (source.isAvailable()) {
-                snapshot = snapshot.mergeLater(source.capture(lang));
+                snapshot = snapshot.mergeLater(scope == null ? source.capture(lang) : source.capture(lang, scope));
             }
         }
         Map<String, Map<String, Object>> byMod = snapshot.mutableByMod();

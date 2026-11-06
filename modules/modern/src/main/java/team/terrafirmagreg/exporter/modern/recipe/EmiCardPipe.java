@@ -40,7 +40,7 @@ import team.terrafirmagreg.exporter.util.ExportLog;
 @UtilityClass
 class EmiCardPipe {
     private static final int MAX_FAILURE_DIAGNOSTICS = 20;
-    private static final int PREPARE_WINDOW = 512;
+    private static final int PREPARE_WINDOW = 1024;
     private static final long AWAIT_SLICE_MS = 50;
     private static final long STATS_LOG_MS = 15_000;
 
@@ -62,6 +62,7 @@ class EmiCardPipe {
             int failed,
             int duplicates,
             int sharedIds,
+            long prepWaitNs,
             EmiCardShots shots) {}
 
     static RecipeSnapshot run(
@@ -201,9 +202,12 @@ class EmiCardPipe {
         int sharedIds = 0;
         ExportLog.Progress progress = ExportLog.progress("data.recipes", list.size());
         long lastStatsLog = System.currentTimeMillis();
+        long prepWaitNs = 0;
         try {
             for (int i = 0; i < list.size(); i++) {
+                long prepWaitStart = System.nanoTime();
                 EmiPreparedCard card = next(i, list, prepared, window, scope, prep);
+                prepWaitNs += System.nanoTime() - prepWaitStart;
                 String id = card.id();
                 String category = card.category();
                 try {
@@ -263,7 +267,7 @@ class EmiCardPipe {
                             ? null
                             : shots.shoot(
                                     imageId,
-                                    recipe,
+                                    card,
                                     card.widgets() == null
                                             ? List.of()
                                             : card.widgets().emiWidgets(),
@@ -305,7 +309,7 @@ class EmiCardPipe {
                         lastStatsLog = now;
                         CardStats stats = shots.stats();
                         ExportLog.info(
-                                "cardstats i={}/{} queued={} deferred={} batched={} capped={} waits={} animated={} reshoots={} renders={} renderMs={} readbackMs={} settleRounds={} settleMs={}",
+                                "cardstats i={}/{} queued={} deferred={} batched={} capped={} waits={} animated={} reshoots={} renders={} renderMs={} readbackMs={} settleRounds={} settleMs={} prepWaitMs={} bookkeepMs={} sceneMs={} gridOverheadMs={} fboMs={} geomMs={} policyMs={} capsMs={} dispatchMs={} enqueueMs={} flushMs={} acceptMs={} reshootMs={} sinkMs={} sceneQueueMs={} handoffMs={} preMs={} gridRenderMs={}",
                                 i + 1,
                                 list.size(),
                                 shots.cardsQueued(),
@@ -319,7 +323,25 @@ class EmiCardPipe {
                                 stats.renderMs,
                                 stats.readbackMs,
                                 stats.settleRounds,
-                                stats.settleMs);
+                                stats.settleMs,
+                                prepWaitNs / 1_000_000,
+                                stats.bookkeepNs / 1_000_000,
+                                stats.sceneNs / 1_000_000,
+                                stats.gridOverheadNs / 1_000_000,
+                                stats.fboNs / 1_000_000,
+                                stats.geomNs / 1_000_000,
+                                stats.policyNs / 1_000_000,
+                                stats.capsNs / 1_000_000,
+                                stats.dispatchNs / 1_000_000,
+                                stats.enqueueNs / 1_000_000,
+                                stats.flushNs / 1_000_000,
+                                stats.acceptNs / 1_000_000,
+                                stats.reshootNs / 1_000_000,
+                                stats.sinkNs / 1_000_000,
+                                stats.sceneQueueNs / 1_000_000,
+                                stats.handoffNs / 1_000_000,
+                                stats.preNs / 1_000_000,
+                                stats.gridRenderNs / 1_000_000);
                     }
                 }
             }
@@ -327,16 +349,34 @@ class EmiCardPipe {
             progress.done();
             scope.metrics().record("data.recipes.duplicates", duplicates);
             scope.metrics().record("data.recipes.sharedIds", sharedIds);
+            scope.metrics().record("data.recipes.prepWaitMs", prepWaitNs / 1_000_000);
             if (shots != null) {
+                shots.close();
                 CardStats stats = shots.stats();
                 scope.metrics().record("data.recipes.renderMs", stats.renderMs);
                 scope.metrics().record("data.recipes.readbackMs", stats.readbackMs);
                 scope.metrics().record("data.recipes.settleMs", stats.settleMs);
+                scope.metrics().record("data.recipes.bookkeepMs", stats.bookkeepNs / 1_000_000);
+                scope.metrics().record("data.recipes.sceneMs", stats.sceneNs / 1_000_000);
+                scope.metrics().record("data.recipes.gridOverheadMs", stats.gridOverheadNs / 1_000_000);
+                scope.metrics().record("data.recipes.fboMs", stats.fboNs / 1_000_000);
+                scope.metrics().record("data.recipes.geomMs", stats.geomNs / 1_000_000);
+                scope.metrics().record("data.recipes.policyMs", stats.policyNs / 1_000_000);
+                scope.metrics().record("data.recipes.capsMs", stats.capsNs / 1_000_000);
+                scope.metrics().record("data.recipes.dispatchMs", stats.dispatchNs / 1_000_000);
+                scope.metrics().record("data.recipes.enqueueMs", stats.enqueueNs / 1_000_000);
+                scope.metrics().record("data.recipes.flushMs", stats.flushNs / 1_000_000);
+                scope.metrics().record("data.recipes.acceptMs", stats.acceptNs / 1_000_000);
+                scope.metrics().record("data.recipes.reshootMs", stats.reshootNs / 1_000_000);
+                scope.metrics().record("data.recipes.sinkMs", stats.sinkNs / 1_000_000);
+                scope.metrics().record("data.recipes.sceneQueueMs", stats.sceneQueueNs / 1_000_000);
+                scope.metrics().record("data.recipes.handoffMs", stats.handoffNs / 1_000_000);
+                scope.metrics().record("data.recipes.preMs", stats.preNs / 1_000_000);
+                scope.metrics().record("data.recipes.gridRenderMs", stats.gridRenderNs / 1_000_000);
                 scope.metrics().record("data.recipes.batched", stats.batched);
                 scope.metrics().record("data.recipes.renders", stats.renders);
                 scope.metrics().record("data.recipes.animated", stats.animated);
                 scope.metrics().record("data.recipes.reshoots", stats.reshoots);
-                shots.close();
             }
         }
         return new Consumed(
@@ -349,6 +389,7 @@ class EmiCardPipe {
                 failed,
                 duplicates,
                 sharedIds,
+                prepWaitNs,
                 shots);
     }
 
@@ -455,7 +496,7 @@ class EmiCardPipe {
                     EmiCardCats.individualCats());
         }
         ExportLog.info(
-                "{} recipes (synthesized={} duplicates={} sharedIds={} skippedVisible={} skippedFilter={} failed={} skippedTooLarge={} cardsQueued={} imageFailures={} waits={} animated={} batched={} deferred={} reshoots={} renders={} renderMs={} readbackMs={} capped={} settleRounds={} settleMs={})",
+                "{} recipes (synthesized={} duplicates={} sharedIds={} skippedVisible={} skippedFilter={} failed={} skippedTooLarge={} cardsQueued={} imageFailures={} waits={} animated={} batched={} deferred={} reshoots={} renders={} renderMs={} readbackMs={} capped={} settleRounds={} settleMs={} prepWaitMs={} bookkeepMs={} sceneMs={} gridOverheadMs={} fboMs={})",
                 consumed.captures().size(),
                 consumed.synthesized(),
                 consumed.duplicates(),
@@ -476,7 +517,12 @@ class EmiCardPipe {
                 stats == null ? 0 : stats.readbackMs,
                 stats == null ? 0 : stats.capped,
                 stats == null ? 0 : stats.settleRounds,
-                stats == null ? 0 : stats.settleMs);
+                stats == null ? 0 : stats.settleMs,
+                consumed.prepWaitNs() / 1_000_000,
+                stats == null ? 0 : stats.bookkeepNs / 1_000_000,
+                stats == null ? 0 : stats.sceneNs / 1_000_000,
+                stats == null ? 0 : stats.gridOverheadNs / 1_000_000,
+                stats == null ? 0 : stats.fboNs / 1_000_000);
     }
 
     private static Enumerated enumerateAll() {
@@ -495,7 +541,7 @@ class EmiCardPipe {
     }
 
     private static int producerCount() {
-        return Math.clamp(Runtime.getRuntime().availableProcessors() / 2, 1, 8);
+        return Math.clamp(Runtime.getRuntime().availableProcessors(), 2, 16);
     }
 
     private static <T> T onRenderThread(Minecraft client, RunScope scope, RenderThreadWork<T> work) throws IOException {

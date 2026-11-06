@@ -17,6 +17,7 @@ import team.terrafirmagreg.exporter.dump.DumpFiles;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
 import team.terrafirmagreg.exporter.dump.io.ArtifactAddressRenderer;
 import team.terrafirmagreg.exporter.dump.io.ArtifactDigestCache;
+import team.terrafirmagreg.exporter.dump.io.WrittenFiles;
 
 public final class DumpTransaction implements AutoCloseable {
     private final Path destination;
@@ -49,6 +50,7 @@ public final class DumpTransaction implements AutoCloseable {
         this.manifestFinalizer = new ManifestFinalizer(writer, catalog, stateMachine);
         this.publisher = new GenerationPublisher(destination, generationRoot, stateMachine);
         Files.createDirectories(generationRoot);
+        WrittenFiles.open(generationRoot);
     }
 
     public static DumpTransaction open(Path destination) throws IOException {
@@ -153,6 +155,7 @@ public final class DumpTransaction implements AutoCloseable {
         }
         closed = true;
         ArtifactDigestCache.forgetUnder(generationRoot);
+        WrittenFiles.close(generationRoot);
         IOException failure = null;
         if (stateMachine.get() != State.PUBLISHED) {
             try {

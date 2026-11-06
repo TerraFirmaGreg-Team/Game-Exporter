@@ -91,6 +91,10 @@ public final class ArtifactAddressRenderer {
     }
 
     public Path render(ArtifactAddress address) {
-        return DumpPaths.resolveUnder(root, relative(address));
+        return resolve(relative(address));
+    }
+
+    public Path resolve(String relativePath) {
+        return DumpPaths.resolveUnder(root, relativePath);
     }
 }

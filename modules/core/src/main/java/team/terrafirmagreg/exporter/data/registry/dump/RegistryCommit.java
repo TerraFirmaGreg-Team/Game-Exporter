@@ -23,6 +23,7 @@ import team.terrafirmagreg.exporter.dump.io.DumpWriter;
 import team.terrafirmagreg.exporter.engine.output.LinkPayload;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
 import team.terrafirmagreg.exporter.engine.run.RunTasks;
+import team.terrafirmagreg.exporter.util.RunMetrics;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -31,6 +32,7 @@ public class RegistryCommit {
 
     public static Map<String, Set<String>> apply(DumpLayout layout, LinkPayload payload, RunScope scope)
             throws IOException {
+        RunMetrics.Stopwatch rootsWatch = scope.metrics().start("commitRegistry.rootsMs");
         Map<String, Map<String, StackGroupValue>> groups = GroupsDump.byNamespace(payload);
         List<CompletableFuture<?>> writes = new ArrayList<>();
         writes.add(scope.tasks().run(() -> RegistryWrites.writeTabs(layout, payload)));
@@ -39,16 +41,42 @@ public class RegistryCommit {
         writes.add(scope.tasks().run(() -> RegistryWrites.writeGroups(layout, groups)));
         writes.add(scope.tasks().run(() -> MultiblockIndex.linkModels(layout)));
         Map<String, ObjectNode> roots = RegistryWrites.entryRoots(payload, scope);
-        SpriteLinker.linkSprites(layout, roots);
-        EntityLinker.linkEntities(layout, roots.get(EntryKind.ENTITY.folder()));
+        rootsWatch.stop();
+        RunMetrics.Stopwatch linkWatch = scope.metrics().start("commitRegistry.linkMs");
+        CompletableFuture<SpriteLinker.SpriteScan> scan = scope.tasks().supply(() -> SpriteLinker.scan(layout, scope));
+        SpriteLinker.SpriteScan sprites = RunTasks.await(scan);
+        List<CompletableFuture<?>> links = new ArrayList<>();
+        links.add(scope.tasks().run(() -> SpriteLinker.cleanup(layout, sprites.atlasFiles())));
+        for (Map.Entry<String, List<SpriteLinker.Placed>> entry :
+                sprites.byFolder().entrySet()) {
+            ObjectNode root = roots.get(entry.getKey());
+            List<SpriteLinker.Placed> placed = entry.getValue();
+            if (EntryKind.ENTITY.folder().equals(entry.getKey())) {
+                links.add(scope.tasks().run(() -> {
+                    SpriteLinker.patchSprites(root, placed, scope);
+                    EntityLinker.linkEntities(layout, root);
+                }));
+            } else {
+                links.add(scope.tasks().run(() -> SpriteLinker.patchSprites(root, placed, scope)));
+            }
+        }
+        if (!sprites.byFolder().containsKey(EntryKind.ENTITY.folder())) {
+            links.add(scope.tasks().run(() -> EntityLinker.linkEntities(layout, roots.get(EntryKind.ENTITY.folder()))));
+        }
+        for (CompletableFuture<?> link : links) {
+            RunTasks.await(link);
+        }
+        linkWatch.stop();
         for (Map.Entry<String, ObjectNode> entry : roots.entrySet()) {
             ObjectNode root = entry.getValue();
             Path file = layout.registry(entry.getKey());
             writes.add(scope.tasks().run(() -> DumpWriter.writeJson(file, EdgeTable.intern(root))));
         }
+        RunMetrics.Stopwatch drainWatch = scope.metrics().start("commitRegistry.drainMs");
         for (CompletableFuture<?> write : writes) {
             RunTasks.await(write);
         }
+        drainWatch.stop();
         return namespaces(roots, payload, groups);
     }
 

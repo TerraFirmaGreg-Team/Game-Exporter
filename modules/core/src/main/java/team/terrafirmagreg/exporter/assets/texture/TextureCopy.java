@@ -17,6 +17,7 @@ import team.terrafirmagreg.exporter.dump.DumpLayout;
 import team.terrafirmagreg.exporter.dump.io.ArtifactDigest;
 import team.terrafirmagreg.exporter.dump.io.ArtifactDigestCache;
 import team.terrafirmagreg.exporter.dump.io.DumpImage;
+import team.terrafirmagreg.exporter.dump.io.WrittenFiles;
 import team.terrafirmagreg.exporter.util.ExportLog;
 
 @UtilityClass
@@ -107,6 +108,7 @@ public class TextureCopy {
             }
             Files.createDirectories(dest.getParent());
             Files.copy(src, dest, StandardCopyOption.REPLACE_EXISTING);
+            WrittenFiles.record(dest, Files.size(dest));
             ArtifactDigest srcDigest = ArtifactDigestCache.lookup(src);
             if (srcDigest != null) {
                 ArtifactDigestCache.remember(dest, srcDigest);
@@ -115,6 +117,7 @@ public class TextureCopy {
             if (Files.isRegularFile(srcMeta)) {
                 Path destMeta = dest.resolveSibling(dest.getFileName().toString() + ".mcmeta");
                 Files.copy(srcMeta, destMeta, StandardCopyOption.REPLACE_EXISTING);
+                WrittenFiles.record(destMeta, Files.size(destMeta));
                 ArtifactDigest metaDigest = ArtifactDigestCache.lookup(srcMeta);
                 if (metaDigest != null) {
                     ArtifactDigestCache.remember(destMeta, metaDigest);

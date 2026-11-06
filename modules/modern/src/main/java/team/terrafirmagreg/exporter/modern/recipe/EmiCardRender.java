@@ -16,7 +16,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import lombok.experimental.UtilityClass;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.renderer.MultiBufferSource;
 import team.terrafirmagreg.exporter.assets.atlas.CaptureMetrics;
 import team.terrafirmagreg.exporter.modern.mixin.EmiTextureWidgetAccessor;
 import team.terrafirmagreg.exporter.modern.model.SceneCapture;
@@ -27,7 +26,7 @@ import team.terrafirmagreg.exporter.util.ExportLog;
 @UtilityClass
 class EmiCardRender {
     private static final int OFF_SCREEN_CURSOR = -1000;
-    private static final double GRID_DRIFT = 0.02;
+    static final double GRID_DRIFT = 0.02;
     private static final ExportLog.WarnCap WIDGET_WARN = ExportLog.warnCapped(10);
 
     static List<Widget> addWidgetsOnce(EmiRecipe recipe) {
@@ -68,8 +67,8 @@ class EmiCardRender {
     }
 
     static CaptureMetrics renderCard(
+            EmiRecipeGui.Canvas canvas,
             OffScreenRenderer renderer,
-            GuiGraphics graphics,
             EmiRecipe recipe,
             List<Widget> widgets,
             int guiW,
@@ -83,50 +82,76 @@ class EmiCardRender {
             throws Exception {
         Minecraft client = Minecraft.getInstance();
         Window window = client.getWindow();
-        MultiBufferSource.BufferSource buffers = client.renderBuffers().bufferSource();
+        GuiGraphics graphics = canvas.graphics();
         Runnable draw = () -> {
             graphics.pose().setIdentity();
             if (selfCapture) {
                 SceneCapture.begin(0, 0, true);
             }
             try {
-                drawCard(EmiDrawContext.wrap(graphics), recipe, widgets, 0, 0, viewH);
+                drawCard(
+                        canvas.context(),
+                        recipe,
+                        widgets,
+                        0,
+                        0,
+                        viewH,
+                        Math.max(1, recipe.getDisplayWidth()),
+                        Math.max(1, recipe.getDisplayHeight()));
             } finally {
                 if (selfCapture) {
                     scene.updateAndGet(prev -> SceneCapture.merge(prev, SceneCapture.end()));
                 }
             }
             graphics.flush();
-            buffers.endBatch();
+            canvas.buffers().endBatch();
         };
         boolean nativeScale = window.getGuiScale() == EmiRecipeGui.guiScale();
         boolean fitsGameWindow = pixelW <= window.getWidth() && pixelH <= window.getHeight();
         CaptureMetrics captured = (nativeScale && fitsGameWindow
-                ? renderer.captureWindowSpace(guiW, guiH, () -> {
-                    renderer.setupItemRendering(window.getGuiScaledWidth(), window.getGuiScaledHeight());
-                    CaptureScissor.begin(window.getHeight(), window.getWidth(), window.getGuiScale());
-                    try {
-                        draw.run();
-                    } finally {
-                        CaptureScissor.end();
-                    }
-                })
-                : renderer.captureArgbWithMetrics(pixelW, pixelH, () -> {
-                    renderer.setupItemRendering(guiW, guiH);
-                    CaptureScissor.begin(pixelH, pixelW, EmiRecipeGui.guiScale());
-                    try {
-                        draw.run();
-                    } finally {
-                        CaptureScissor.end();
-                    }
-                }));
+                ? renderer.captureWindowSpace(
+                        guiW,
+                        guiH,
+                        () -> framed(
+                                () -> {
+                                    renderer.setupItemRendering(
+                                            window.getGuiScaledWidth(), window.getGuiScaledHeight());
+                                    CaptureScissor.begin(window.getHeight(), window.getWidth(), window.getGuiScale());
+                                },
+                                draw,
+                                stats))
+                : renderer.captureArgbWithMetrics(
+                        pixelW,
+                        pixelH,
+                        () -> framed(
+                                () -> {
+                                    renderer.setupItemRendering(guiW, guiH);
+                                    CaptureScissor.begin(pixelH, pixelW, EmiRecipeGui.guiScale());
+                                },
+                                draw,
+                                stats)));
         stats.renders++;
         stats.renderMs += captured.renderMs();
         stats.readbackMs += captured.readbackMs();
+        stats.fboNs += captured.fboNanos();
         return captured;
     }
 
+    private static void framed(Runnable setup, Runnable draw, CardStats stats) {
+        long setupStart = System.nanoTime();
+        setup.run();
+        stats.fboNs += System.nanoTime() - setupStart;
+        try {
+            draw.run();
+        } finally {
+            long endStart = System.nanoTime();
+            CaptureScissor.end();
+            stats.fboNs += System.nanoTime() - endStart;
+        }
+    }
+
     static CaptureMetrics renderGrid(
+            EmiRecipeGui.Canvas canvas,
             OffScreenRenderer renderer,
             List<EmiRecipeGui.CardCell> cells,
             int cols,
@@ -141,73 +166,84 @@ class EmiCardRender {
             throws Exception {
         int gridW = cols * cellPxW;
         int gridH = rows * cellPxH;
-        Minecraft client = Minecraft.getInstance();
-        GuiGraphics graphics = new GuiGraphics(client, client.renderBuffers().bufferSource());
-        MultiBufferSource.BufferSource buffers = client.renderBuffers().bufferSource();
-        CaptureMetrics captured = renderer.captureArgbWithMetrics(gridW, gridH, () -> {
-            renderer.setupItemRendering(cols * cellGuiW, rows * cellGuiH);
-            CaptureScissor.begin(gridH, gridW, EmiRecipeGui.guiScale());
-            EmiDrawContext context = EmiDrawContext.wrap(graphics);
-            try {
-                for (int i = 0; i < cells.size(); i++) {
-                    int col = i % cols;
-                    int row = i / cols;
-                    EmiRecipeGui.CardCell cell = cells.get(i);
-                    try {
-                        CaptureScissor.pushPx(col * cellPxW, gridH - (row + 1) * cellPxH, cellPxW, cellPxH);
-                        graphics.pose().setIdentity();
-                        List<Widget> widgets = cell.widgets();
-                        if (containsExternalWidget(widgets)) {
-                            synchronized (WidgetTreeLock.LOCK) {
-                                List<Widget> fresh = addWidgetsOnce(cell.recipe());
-                                drawCell(
-                                        context,
-                                        cell.recipe(),
-                                        fresh,
-                                        col * cellGuiW,
-                                        row * cellGuiH,
-                                        ok,
-                                        scenes,
-                                        i,
-                                        cell.viewH());
+        GuiGraphics graphics = canvas.graphics();
+        CaptureMetrics captured = renderer.captureArgbWithMetrics(
+                gridW,
+                gridH,
+                () -> framed(
+                        () -> {
+                            renderer.setupItemRendering(cols * cellGuiW, rows * cellGuiH);
+                            CaptureScissor.begin(gridH, gridW, EmiRecipeGui.guiScale());
+                        },
+                        () -> {
+                            EmiDrawContext context = canvas.context();
+                            for (int i = 0; i < cells.size(); i++) {
+                                int col = i % cols;
+                                int row = i / cols;
+                                EmiRecipeGui.CardCell cell = cells.get(i);
+                                try {
+                                    CaptureScissor.pushPx(col * cellPxW, gridH - (row + 1) * cellPxH, cellPxW, cellPxH);
+                                    graphics.pose().setIdentity();
+                                    List<Widget> widgets = cell.widgets();
+                                    if (containsExternalWidget(widgets)) {
+                                        synchronized (WidgetTreeLock.LOCK) {
+                                            List<Widget> fresh = addWidgetsOnce(cell.recipe());
+                                            drawCell(
+                                                    context,
+                                                    cell.recipe(),
+                                                    fresh,
+                                                    col * cellGuiW,
+                                                    row * cellGuiH,
+                                                    ok,
+                                                    scenes,
+                                                    i,
+                                                    cell.viewH(),
+                                                    cell.displayW(),
+                                                    cell.displayH());
+                                        }
+                                    } else {
+                                        if (widgets == null || widgets.isEmpty()) {
+                                            widgets = addWidgetsOnce(cell.recipe());
+                                        }
+                                        drawCell(
+                                                context,
+                                                cell.recipe(),
+                                                widgets,
+                                                col * cellGuiW,
+                                                row * cellGuiH,
+                                                ok,
+                                                scenes,
+                                                i,
+                                                cell.viewH(),
+                                                cell.displayW(),
+                                                cell.displayH());
+                                    }
+                                } catch (Throwable t) {
+                                    ExportLog.debug("card grid cell {} failed: {}", i, t.toString());
+                                } finally {
+                                    CaptureScissor.pop();
+                                }
                             }
-                        } else {
-                            if (widgets == null || widgets.isEmpty()) {
-                                widgets = addWidgetsOnce(cell.recipe());
-                            }
-                            drawCell(
-                                    context,
-                                    cell.recipe(),
-                                    widgets,
-                                    col * cellGuiW,
-                                    row * cellGuiH,
-                                    ok,
-                                    scenes,
-                                    i,
-                                    cell.viewH());
-                        }
-                    } catch (Throwable t) {
-                        ExportLog.debug("card grid cell {} failed: {}", i, t.toString());
-                    } finally {
-                        CaptureScissor.pop();
-                    }
-                }
-                graphics.flush();
-                buffers.endBatch();
-            } finally {
-                CaptureScissor.end();
-            }
-        });
+                            graphics.flush();
+                            canvas.buffers().endBatch();
+                        },
+                        stats));
         stats.renders++;
         stats.renderMs += captured.renderMs();
         stats.readbackMs += captured.readbackMs();
+        stats.fboNs += captured.fboNanos();
         return captured;
     }
 
     private static void drawCard(
-            EmiDrawContext context, EmiRecipe recipe, List<Widget> widgets, int guiX, int guiY, Integer viewH) {
-        int displayW = Math.max(1, recipe.getDisplayWidth());
-        int displayH = Math.max(1, recipe.getDisplayHeight());
+            EmiDrawContext context,
+            EmiRecipe recipe,
+            List<Widget> widgets,
+            int guiX,
+            int guiY,
+            Integer viewH,
+            int displayW,
+            int displayH) {
         if (viewH != null && viewH < displayH) {
             context.resetColor();
             EmiRenderHelper.drawNinePatch(
@@ -217,7 +253,7 @@ class EmiCardRender {
         }
         context.push();
         context.matrices().translate(guiX + EmiRecipeGui.MARGIN, guiY + EmiRecipeGui.MARGIN, 0);
-        renderWidgets(recipe, viewH != null ? MemberGrid.templateWidgets(widgets) : widgets, context.raw());
+        renderWidgets(recipe, viewH != null ? MemberGrid.templateWidgets(widgets) : widgets, context, displayW);
         context.pop();
     }
 
@@ -230,10 +266,12 @@ class EmiCardRender {
             boolean[] ok,
             SceneCapture.Result[] scenes,
             int i,
-            Integer viewH) {
+            Integer viewH,
+            int displayW,
+            int displayH) {
         SceneCapture.begin(guiX, guiY, true);
         try {
-            drawCard(context, recipe, widgets, guiX, guiY, viewH);
+            drawCard(context, recipe, widgets, guiX, guiY, viewH, displayW, displayH);
             ok[i] = true;
         } finally {
             SceneCapture.Result scene = SceneCapture.end();
@@ -243,11 +281,12 @@ class EmiCardRender {
         }
     }
 
-    private static void renderWidgets(EmiRecipe recipe, List<Widget> widgets, GuiGraphics graphics) {
+    private static void renderWidgets(EmiRecipe recipe, List<Widget> widgets, EmiDrawContext context, int displayW) {
         if (widgets == null) {
             return;
         }
-        int neutralMouseX = Math.max(1, recipe.getDisplayWidth()) / 2 - 30;
+        GuiGraphics graphics = context.raw();
+        int neutralMouseX = displayW / 2 - 30;
         int originX = Math.round(graphics.pose().last().pose().m30());
         int originY = Math.round(graphics.pose().last().pose().m31());
         for (Widget widget : widgets) {
@@ -263,7 +302,7 @@ class EmiCardRender {
                             widget instanceof TextWidget);
                 }
                 if (widget instanceof AnimatedTextureWidget animated) {
-                    drawAnimatedStill(animated, bounds, graphics);
+                    drawAnimatedStill(animated, bounds, context);
                 } else {
                     widget.render(
                             graphics,
@@ -282,26 +321,25 @@ class EmiCardRender {
         SceneCapture.bakeUnrendered(graphics, EmiRecipeGui.MARGIN);
     }
 
-    private static void drawAnimatedStill(AnimatedTextureWidget widget, Bounds bounds, GuiGraphics graphics) {
+    private static void drawAnimatedStill(AnimatedTextureWidget widget, Bounds bounds, EmiDrawContext context) {
         EmiTextureWidgetAccessor texture = (EmiTextureWidgetAccessor) widget;
-        EmiDrawContext.wrap(graphics)
-                .drawTexture(
-                        texture.gameExporter$texture(),
-                        bounds.x(),
-                        bounds.y(),
-                        bounds.width(),
-                        bounds.height(),
-                        texture.gameExporter$u(),
-                        texture.gameExporter$v(),
-                        texture.gameExporter$regionWidth(),
-                        texture.gameExporter$regionHeight(),
-                        texture.gameExporter$textureWidth(),
-                        texture.gameExporter$textureHeight());
+        context.drawTexture(
+                texture.gameExporter$texture(),
+                bounds.x(),
+                bounds.y(),
+                bounds.width(),
+                bounds.height(),
+                texture.gameExporter$u(),
+                texture.gameExporter$v(),
+                texture.gameExporter$regionWidth(),
+                texture.gameExporter$regionHeight(),
+                texture.gameExporter$textureWidth(),
+                texture.gameExporter$textureHeight());
     }
 
     static void verifyGrid(
+            EmiRecipeGui.Canvas canvas,
             OffScreenRenderer renderer,
-            GuiGraphics graphics,
             EmiRecipe recipe,
             List<Widget> widgets,
             int guiW,
@@ -318,8 +356,14 @@ class EmiCardRender {
         }
         boolean[] ok = new boolean[1];
         CaptureMetrics grid = renderGrid(
+                canvas,
                 renderer,
-                List.of(new EmiRecipeGui.CardCell(recipe, widgets, viewH)),
+                List.of(new EmiRecipeGui.CardCell(
+                        recipe,
+                        widgets,
+                        viewH,
+                        Math.max(1, recipe.getDisplayWidth()),
+                        Math.max(1, recipe.getDisplayHeight()))),
                 1,
                 1,
                 guiW,

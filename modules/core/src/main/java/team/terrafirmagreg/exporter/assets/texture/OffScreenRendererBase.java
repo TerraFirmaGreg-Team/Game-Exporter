@@ -48,10 +48,13 @@ public abstract class OffScreenRendererBase implements AutoCloseable {
                     "readback " + readWidth + "x" + readHeight + " exceeds " + width + "x" + height);
         }
         RunMetrics metrics = new RunMetrics();
+        long[] fboNs = {0};
         metrics.timed("render", () -> {
+            long fboStart = System.nanoTime();
             bindWrite();
             viewport(0, 0, viewportWidth, viewportHeight);
             clearBuffers();
+            fboNs[0] = System.nanoTime() - fboStart;
             draw.run();
         });
         int[] argb = metrics.timed("readback", () -> {
@@ -63,7 +66,7 @@ public abstract class OffScreenRendererBase implements AutoCloseable {
             return ArgbImage.bgraRevToArgb(raw, readWidth, readHeight, true);
         });
         return new CaptureMetrics(
-                argb, metrics.timings().get("render"), metrics.timings().get("readback"));
+                argb, metrics.timings().get("render"), metrics.timings().get("readback"), fboNs[0]);
     }
 
     @Override

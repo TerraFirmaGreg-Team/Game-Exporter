@@ -9,6 +9,7 @@ import lombok.experimental.UtilityClass;
 import team.terrafirmagreg.exporter.dump.io.ArtifactDigest;
 import team.terrafirmagreg.exporter.dump.io.ArtifactDigestCache;
 import team.terrafirmagreg.exporter.dump.io.DumpHashes;
+import team.terrafirmagreg.exporter.dump.io.WrittenFiles;
 
 @UtilityClass
 public class DumpFiles {
@@ -17,6 +18,7 @@ public class DumpFiles {
         Files.createDirectories(target.getParent());
         Files.write(target, content);
         ArtifactDigestCache.remember(target, new ArtifactDigest(content.length, DumpHashes.sha256(content)));
+        WrittenFiles.record(target, content.length);
     }
 
     public static void copy(Path source, Path target) throws IOException {
@@ -27,6 +29,7 @@ public class DumpFiles {
             ArtifactDigest digest = new ArtifactDigest(Files.size(temporary), DumpHashes.sha256(temporary));
             replace(temporary, target);
             ArtifactDigestCache.remember(target, digest);
+            WrittenFiles.record(target, digest.size());
         } finally {
             Files.deleteIfExists(temporary);
         }
@@ -49,6 +52,7 @@ public class DumpFiles {
                 Files.delete(path);
             }
         }
+        WrittenFiles.discardUnder(root);
     }
 
     public static String stripExtension(String name) {

@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 import lombok.experimental.UtilityClass;
 import team.terrafirmagreg.exporter.contract.dto.atlas.AtlasDocument;
@@ -18,6 +19,9 @@ import team.terrafirmagreg.exporter.contract.ref.TaggedReference;
 import team.terrafirmagreg.exporter.dump.AssetPaths;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
 import team.terrafirmagreg.exporter.dump.io.DumpWriter;
+import team.terrafirmagreg.exporter.dump.io.WrittenFiles;
+import team.terrafirmagreg.exporter.engine.run.RunScope;
+import team.terrafirmagreg.exporter.engine.run.RunTasks;
 import team.terrafirmagreg.exporter.util.ExportLog;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
@@ -26,12 +30,13 @@ import tools.jackson.databind.node.ObjectNode;
 @UtilityClass
 class SpriteLinker {
 
-    static void linkSprites(DumpLayout layout, Map<String, ObjectNode> roots) throws IOException {
+    private static final int MIN_PARALLEL_ENTRIES = 256;
+
+    static SpriteScan scan(DumpLayout layout, RunScope scope) throws IOException {
         Path assets = layout.assets();
         if (!Files.isDirectory(assets)) {
-            return;
+            return new SpriteScan(Map.of(), List.of());
         }
-        Map<String, List<Placed>> byFolder = new LinkedHashMap<>();
         List<Path> atlasFiles = new ArrayList<>();
         try (Stream<Path> mods = Files.list(assets)) {
             for (Path modDir : mods.filter(Files::isDirectory).sorted().toList()) {
@@ -40,21 +45,72 @@ class SpriteLinker {
                     continue;
                 }
                 try (Stream<Path> files = Files.list(atlases)) {
-                    for (Path file : files.filter(
-                                    p -> p.getFileName().toString().endsWith(".json"))
+                    files.filter(p -> p.getFileName().toString().endsWith(".json"))
                             .sorted()
-                            .toList()) {
-                        atlasFiles.add(file);
-                        collect(DumpWriter.readValue(file, AtlasDocument.class), byFolder);
-                    }
+                            .forEach(atlasFiles::add);
                 }
             }
         }
-        for (Map.Entry<String, List<Placed>> entry : byFolder.entrySet()) {
-            patchSprites(roots.get(entry.getKey()), entry.getValue());
+        List<CompletableFuture<Map<String, List<Placed>>>> parsed = new ArrayList<>();
+        for (Path file : atlasFiles) {
+            parsed.add(scope.tasks().supply(() -> {
+                Map<String, List<Placed>> byFolder = new LinkedHashMap<>();
+                collect(DumpWriter.readValue(file, AtlasDocument.class), byFolder);
+                return byFolder;
+            }));
         }
+        Map<String, List<Placed>> byFolder = new LinkedHashMap<>();
+        for (CompletableFuture<Map<String, List<Placed>>> future : parsed) {
+            for (Map.Entry<String, List<Placed>> entry : RunTasks.await(future).entrySet()) {
+                byFolder.computeIfAbsent(entry.getKey(), ignored -> new ArrayList<>())
+                        .addAll(entry.getValue());
+            }
+        }
+        return new SpriteScan(byFolder, atlasFiles);
+    }
+
+    static void patchSprites(ObjectNode root, List<Placed> sprites, RunScope scope) throws IOException {
+        if (root == null || sprites == null || sprites.isEmpty()) {
+            return;
+        }
+        Map<String, List<Placed>> byId = new LinkedHashMap<>();
+        for (Placed placed : sprites) {
+            byId.computeIfAbsent(placed.id(), ignored -> new ArrayList<>()).add(placed);
+        }
+        List<Map.Entry<String, List<Placed>>> entries = new ArrayList<>(byId.entrySet());
+        int workers = Math.min(
+                entries.size() / MIN_PARALLEL_ENTRIES + 1, Runtime.getRuntime().availableProcessors());
+        if (workers <= 1) {
+            for (Map.Entry<String, List<Placed>> entry : entries) {
+                applySprites(root, entry.getKey(), entry.getValue());
+            }
+            return;
+        }
+        int chunk = (entries.size() + workers - 1) / workers;
+        List<CompletableFuture<?>> pending = new ArrayList<>();
+        for (int from = 0; from < entries.size(); from += chunk) {
+            int first = from;
+            int last = Math.min(entries.size(), from + chunk);
+            pending.add(scope.tasks().run(() -> {
+                for (int i = first; i < last; i++) {
+                    Map.Entry<String, List<Placed>> entry = entries.get(i);
+                    applySprites(root, entry.getKey(), entry.getValue());
+                }
+            }));
+        }
+        for (CompletableFuture<?> future : pending) {
+            RunTasks.await(future);
+        }
+    }
+
+    static void cleanup(DumpLayout layout, List<Path> atlasFiles) throws IOException {
         for (Path file : atlasFiles) {
             Files.delete(file);
+            WrittenFiles.discard(file);
+        }
+        Path assets = layout.assets();
+        if (!Files.isDirectory(assets)) {
+            return;
         }
         try (Stream<Path> mods = Files.list(assets)) {
             for (Path modDir : mods.filter(Files::isDirectory).toList()) {
@@ -62,6 +118,21 @@ class SpriteLinker {
                 if (Files.isDirectory(atlases) && isEmpty(atlases)) {
                     Files.delete(atlases);
                 }
+            }
+        }
+    }
+
+    private static void applySprites(ObjectNode root, String id, List<Placed> sprites) {
+        JsonNode node = root.get(id);
+        if (!(node instanceof ObjectNode entryNode)) {
+            ExportLog.debug("sprite without registry entry: {}", id);
+            return;
+        }
+        for (Placed placed : sprites) {
+            if (placed.tag() == null || placed.tag().isNull()) {
+                RegistryNodes.putAfter(entryNode, "display", "sprite", spriteNode(placed.sprite()));
+            } else if (!linkVariant(entryNode, placed)) {
+                ExportLog.debug("sprite without variant: {}", id);
             }
         }
     }
@@ -79,30 +150,6 @@ class SpriteLinker {
                     page.image(), row.x(), row.y(), row.w(), row.h(), page.w(), page.h(), row.tint(), row.tintColor());
             byFolder.computeIfAbsent(kind.folder(), ignored -> new ArrayList<>())
                     .add(new Placed(stack.id().toString(), stack.tag(), sprite));
-        }
-    }
-
-    private static void patchSprites(ObjectNode root, List<Placed> sprites) {
-        if (root == null) {
-            return;
-        }
-        Map<String, List<Placed>> byId = new LinkedHashMap<>();
-        for (Placed placed : sprites) {
-            byId.computeIfAbsent(placed.id(), ignored -> new ArrayList<>()).add(placed);
-        }
-        for (Map.Entry<String, List<Placed>> entry : byId.entrySet()) {
-            JsonNode node = root.get(entry.getKey());
-            if (!(node instanceof ObjectNode entryNode)) {
-                ExportLog.debug("sprite without registry entry: {}", entry.getKey());
-                continue;
-            }
-            for (Placed placed : entry.getValue()) {
-                if (placed.tag() == null || placed.tag().isNull()) {
-                    RegistryNodes.putAfter(entryNode, "display", "sprite", spriteNode(placed.sprite()));
-                } else if (!linkVariant(entryNode, placed)) {
-                    ExportLog.debug("sprite without variant: {}", entry.getKey());
-                }
-            }
         }
     }
 
@@ -131,5 +178,7 @@ class SpriteLinker {
         }
     }
 
-    private record Placed(String id, JsonNode tag, SpriteEntry sprite) {}
+    record SpriteScan(Map<String, List<Placed>> byFolder, List<Path> atlasFiles) {}
+
+    record Placed(String id, JsonNode tag, SpriteEntry sprite) {}
 }

@@ -6,6 +6,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import team.terrafirmagreg.exporter.assets.lang.LangKeySource;
 import team.terrafirmagreg.exporter.engine.demand.ResourceDemand;
+import team.terrafirmagreg.exporter.engine.run.RunScope;
 import team.terrafirmagreg.exporter.util.ExportLog;
 import tools.jackson.databind.JsonNode;
 
@@ -38,13 +39,13 @@ public abstract class QuestBookSourceBase implements QuestSource, QuestNormalize
     }
 
     @Override
-    public Set<String> langKeys(String lang) {
+    public Set<String> langKeys(String lang, RunScope scope) {
         Set<String> keys = new TreeSet<>(LangKeySource.overrides(gameDir(), lang));
         Path source = findOnDisk(gameDir());
         if (source != null) {
             keys.addAll(LangKeySource.langDir(source.resolve("lang"), lang));
         }
-        keys.addAll(resourceLangKeys(lang));
+        keys.addAll(resourceLangKeys(lang, scope));
         return Set.copyOf(keys);
     }
 
@@ -57,7 +58,7 @@ public abstract class QuestBookSourceBase implements QuestSource, QuestNormalize
 
     protected abstract Path gameDir();
 
-    protected Set<String> resourceLangKeys(String lang) {
+    protected Set<String> resourceLangKeys(String lang, RunScope scope) {
         return Set.of();
     }
 }

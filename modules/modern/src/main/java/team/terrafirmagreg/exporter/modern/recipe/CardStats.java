@@ -13,4 +13,21 @@ final class CardStats {
     long renderMs;
     long readbackMs;
     long settleMs;
+    long bookkeepNs;
+    long sceneNs;
+    long gridOverheadNs;
+    long fboNs;
+    long geomNs;
+    long policyNs;
+    long capsNs;
+    long dispatchNs;
+    long enqueueNs;
+    long flushNs;
+    long acceptNs;
+    long reshootNs;
+    long sinkNs;
+    long sceneQueueNs;
+    long handoffNs;
+    long preNs;
+    long gridRenderNs;
 }

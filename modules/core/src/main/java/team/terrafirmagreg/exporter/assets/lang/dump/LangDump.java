@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.CompletableFuture;
 import lombok.experimental.UtilityClass;
 import team.terrafirmagreg.exporter.assets.lang.KeybindsAssembler;
 import team.terrafirmagreg.exporter.assets.lang.LangAssembler;
@@ -24,6 +25,7 @@ import team.terrafirmagreg.exporter.contract.text.LangAdditions;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
 import team.terrafirmagreg.exporter.dump.io.DumpWriter;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
+import team.terrafirmagreg.exporter.engine.run.RunTasks;
 import team.terrafirmagreg.exporter.engine.spec.options.ModIdFilter;
 
 @UtilityClass
@@ -78,8 +80,19 @@ public class LangDump {
         Map<String, Map<String, String>> mergedLangs = new Object2ObjectLinkedOpenHashMap<>();
         Map<String, Map<String, Map<String, String>>> extrasByLang = extras == null ? Map.of() : extras.byLang();
         Map<String, Map<String, Object>> english = null;
+        List<CompletableFuture<LangSnapshot>> assembled = new ObjectArrayList<>();
         for (String lang : ordered) {
-            LangSnapshot snapshot = LangAssembler.assemble(gameDir, lang, sources, modFilter);
+            if (scope == null) {
+                assembled.add(
+                        CompletableFuture.completedFuture(LangAssembler.assemble(gameDir, lang, sources, modFilter)));
+            } else {
+                assembled.add(
+                        scope.tasks().supply(() -> LangAssembler.assemble(gameDir, lang, sources, modFilter, scope)));
+            }
+        }
+        for (int i = 0; i < ordered.size(); i++) {
+            String lang = ordered.get(i);
+            LangSnapshot snapshot = RunTasks.await(assembled.get(i));
             snapshot = LangAssembler.applyDisplayFills(snapshot, displayFills, keybinds);
             snapshot = LangAssembler.applyExtras(snapshot, extrasByLang.get(lang));
             Set<String> owned = snapshot.ownedModIds();

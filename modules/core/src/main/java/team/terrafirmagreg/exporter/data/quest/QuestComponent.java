@@ -90,7 +90,7 @@ public final class QuestComponent implements ExportTask, NodeContributor {
                 layout,
                 ns,
                 normalizers.get(used),
-                used::langKeys,
+                lang -> used.langKeys(lang, context.scope()),
                 request.languages(),
                 context.scope(),
                 extras);

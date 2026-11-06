@@ -9,11 +9,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 import team.terrafirmagreg.exporter.assets.lang.LangKeySource;
 import team.terrafirmagreg.exporter.contract.id.ResourceId;
 import team.terrafirmagreg.exporter.data.guide.GuideSnapshot.GuideBook;
 import team.terrafirmagreg.exporter.engine.demand.DemandExtractor;
+import team.terrafirmagreg.exporter.engine.demand.ResourceDemand;
+import team.terrafirmagreg.exporter.engine.output.GuideJsonCache;
+import team.terrafirmagreg.exporter.engine.run.RunScope;
+import team.terrafirmagreg.exporter.engine.run.RunTasks;
 import team.terrafirmagreg.exporter.engine.spec.options.BookIdFilter;
 import team.terrafirmagreg.exporter.engine.spec.options.ModIdFilter;
 import team.terrafirmagreg.exporter.util.ExportLog;
@@ -36,42 +41,71 @@ public abstract class GuideBookSourceBase implements GuideSource {
     }
 
     @Override
-    public GuideSnapshot capture(BookIdFilter books, ModIdFilter mods, List<String> languages) throws IOException {
+    public GuideSnapshot capture(BookIdFilter books, ModIdFilter mods, List<String> languages, RunScope scope)
+            throws IOException {
         Path gameDir = gameDir();
         List<String> targets = resolveBooks(books, mods);
         GuideSnapshot.Builder builder = new GuideSnapshot.Builder();
+        GuideJsonCache jsonCache = builder.jsonCache();
+        if (scope == null) {
+            for (String bookRef : targets) {
+                mergeBook(builder, collectBook(gameDir, bookRef, jsonCache));
+            }
+            return builder.build();
+        }
+        List<CompletableFuture<BookCapture>> pending = new ArrayList<>();
         for (String bookRef : targets) {
-            ResourceId ref = ResourceId.parse(bookRef, defaultNamespace);
-            String namespace = ref.namespace();
-            String bookId = ref.path();
-            Map<String, byte[]> files = new LinkedHashMap<>();
-            Path disk = GuideBookPaths.findBookOnDisk(gameDir, bookRef, defaultNamespace);
-            if (disk != null && Files.isDirectory(disk)) {
-                collectDisk(disk, files);
-            }
-            collectResources(namespace, bookId, files);
-            if (!bookComplete(files)) {
-                ExportLog.warn("no book files for {}", bookRef);
-                continue;
-            }
-            String bookKey = namespace + ":" + bookId;
-            for (Map.Entry<String, byte[]> entry : files.entrySet()) {
-                var json = builder.jsonCache().put(bookKey, entry.getKey(), entry.getValue());
-                if (json != null) {
-                    if ("book.json".equals(entry.getKey()) && json instanceof ObjectNode bookJson) {
-                        ObjectNode demandDoc = bookJson.deepCopy();
-                        demandDoc.remove("model");
-                        DemandExtractor.fromElement(demandDoc, builder.demand());
-                    } else {
-                        DemandExtractor.fromElement(json, builder.demand());
-                    }
-                }
-            }
-            builder.book(new GuideBook(namespace, bookId, files));
-            ExportLog.info("capture {}:{} - {} files", namespace, bookId, files.size());
+            pending.add(scope.tasks().supply(() -> collectBook(gameDir, bookRef, jsonCache)));
+        }
+        for (CompletableFuture<BookCapture> captured : pending) {
+            mergeBook(builder, RunTasks.await(captured));
         }
         return builder.build();
     }
+
+    private BookCapture collectBook(Path gameDir, String bookRef, GuideJsonCache jsonCache) throws IOException {
+        ResourceId ref = ResourceId.parse(bookRef, defaultNamespace);
+        String namespace = ref.namespace();
+        String bookId = ref.path();
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        Path disk = GuideBookPaths.findBookOnDisk(gameDir, bookRef, defaultNamespace);
+        if (disk != null && Files.isDirectory(disk)) {
+            collectDisk(disk, files);
+        }
+        collectResources(namespace, bookId, files);
+        String bookKey = namespace + ":" + bookId;
+        ResourceDemand.Builder demand = ResourceDemand.builder();
+        for (Map.Entry<String, byte[]> entry : files.entrySet()) {
+            var json = jsonCache.put(bookKey, entry.getKey(), entry.getValue());
+            if (json != null) {
+                if ("book.json".equals(entry.getKey()) && json instanceof ObjectNode bookJson) {
+                    ObjectNode demandDoc = bookJson.deepCopy();
+                    demandDoc.remove("model");
+                    DemandExtractor.fromElement(demandDoc, demand);
+                } else {
+                    DemandExtractor.fromElement(json, demand);
+                }
+            }
+        }
+        return new BookCapture(bookRef, namespace, bookId, files, demand.build());
+    }
+
+    private void mergeBook(GuideSnapshot.Builder builder, BookCapture captured) {
+        if (!bookComplete(captured.files())) {
+            ExportLog.warn("no book files for {}", captured.bookRef());
+            return;
+        }
+        builder.demand().merge(captured.demand());
+        builder.book(new GuideBook(captured.namespace(), captured.bookId(), captured.files()));
+        ExportLog.info(
+                "capture {}:{} - {} files",
+                captured.namespace(),
+                captured.bookId(),
+                captured.files().size());
+    }
+
+    private record BookCapture(
+            String bookRef, String namespace, String bookId, Map<String, byte[]> files, ResourceDemand demand) {}
 
     private List<String> resolveBooks(BookIdFilter bookFilter, ModIdFilter modFilter) {
         Set<String> discovered = discoverBooks();
@@ -121,13 +155,13 @@ public abstract class GuideBookSourceBase implements GuideSource {
     }
 
     @Override
-    public Set<String> langKeys(String lang) {
+    public Set<String> langKeys(String lang, RunScope scope) {
         Set<String> keys = new TreeSet<>(LangKeySource.overrides(gameDir(), lang));
-        keys.addAll(resourceLangKeys(lang));
+        keys.addAll(resourceLangKeys(lang, scope));
         return Set.copyOf(keys);
     }
 
-    protected Set<String> resourceLangKeys(String lang) {
+    protected Set<String> resourceLangKeys(String lang, RunScope scope) {
         return Set.of();
     }
 }

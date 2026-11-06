@@ -1,5 +1,6 @@
 package team.terrafirmagreg.exporter.assets.lang;
 
+import team.terrafirmagreg.exporter.engine.run.RunScope;
 import team.terrafirmagreg.exporter.spi.CaptureSource;
 import team.terrafirmagreg.exporter.spi.MergePolicy;
 import team.terrafirmagreg.exporter.spi.SourceDescriptor;
@@ -13,4 +14,8 @@ public interface LangSource extends CaptureSource {
     }
 
     LangSnapshot capture(String language);
+
+    default LangSnapshot capture(String language, RunScope scope) {
+        return capture(language);
+    }
 }

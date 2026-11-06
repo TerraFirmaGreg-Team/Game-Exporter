@@ -62,37 +62,48 @@ public class ManifestDump {
         RunMetrics metrics = new RunMetrics();
         RunMetrics.Stopwatch total = metrics.start("total");
         RunTasks tasks = session == null ? null : session.tasks();
+        RunMetrics nodes = session == null ? metrics : session.metrics();
         Map<String, String> modKeys = modDisplayKeys(results);
         RunMetrics.Stopwatch manifests = metrics.start("manifests");
-        CompletableFuture<Set<String>> groupNamespaces =
-                supply(tasks, () -> GroupsDump.byNamespace(payload).keySet());
-        CompletableFuture<RecipeScan> scan = supply(tasks, () -> recipeScan(payload));
-        CompletableFuture<List<String>> used = supply(tasks, () -> usedContent(payload));
-        CompletableFuture<Map<String, String>> quests = supply(tasks, () -> questPointers(layout, catalog));
-        CompletableFuture<Void> schemas = supply(tasks, () -> {
-            SchemaDump.write(layout);
+        CompletableFuture<Set<String>> groupNamespaces = timed(
+                tasks,
+                nodes,
+                "manifests.groupsMs",
+                () -> GroupsDump.byNamespace(payload).keySet());
+        CompletableFuture<RecipeScan> scan = timed(tasks, nodes, "manifests.recipeScanMs", () -> recipeScan(payload));
+        CompletableFuture<List<String>> used = timed(tasks, nodes, "manifests.usedMs", () -> usedContent(payload));
+        CompletableFuture<Map<String, String>> quests =
+                timed(tasks, nodes, "manifests.questsMs", () -> questPointers(layout, catalog));
+        CompletableFuture<Void> schemas = timed(tasks, nodes, "manifests.schemaMs", () -> {
+            SchemaDump.write(layout, tasks);
             return null;
         });
-        CompletableFuture<CatalogProjection> projection = supply(
+        CompletableFuture<CatalogProjection> projectionBase = timed(
                 tasks,
+                nodes,
+                "manifests.projectionMs",
                 () -> new CatalogProjection(
                         catalog,
                         request.languages(),
-                        RunTasks.await(scan).categories(),
-                        RunTasks.await(groupNamespaces),
                         registryKinds,
                         payload.namespaceLanguages(),
                         payload.keybindNamespaces()));
-        CompletableFuture<Void> recipeIndex = supply(tasks, () -> {
+        CompletableFuture<CatalogProjection> projection = supply(tasks, () -> {
+            CatalogProjection projected = RunTasks.await(projectionBase);
+            projected.groups(RunTasks.await(groupNamespaces));
+            projected.recipes(RunTasks.await(scan).categories());
+            return projected;
+        });
+        CompletableFuture<Void> recipeIndex = timed(tasks, nodes, "manifests.recipeIndexMs", () -> {
             writeRecipeIndexes(layout, RunTasks.await(projection).recipeIndexes());
             return null;
         });
-        CompletableFuture<ReportFiles> stats = supply(tasks, () -> {
+        CompletableFuture<ReportFiles> stats = timed(tasks, nodes, "manifests.fileStatsMs", () -> {
             RunTasks.await(schemas);
             RunTasks.await(recipeIndex);
-            return ReportFileStats.of(layout.root());
+            return ReportFileStats.of(layout.root(), tasks);
         });
-        CompletableFuture<Void> report = supply(tasks, () -> {
+        CompletableFuture<Void> report = timed(tasks, nodes, "manifests.reportMs", () -> {
             writeReport(layout, request, results, session, generation, RunTasks.await(stats));
             return null;
         });
@@ -124,6 +135,18 @@ public class ManifestDump {
             tasks.drain();
         }
         return rootManifest;
+    }
+
+    private static <T> CompletableFuture<T> timed(
+            RunTasks tasks, RunMetrics metrics, String name, RunTasks.ThrowingSupplier<T> work) {
+        return supply(tasks, () -> {
+            RunMetrics.Stopwatch watch = metrics.start(name);
+            try {
+                return work.get();
+            } finally {
+                watch.stop();
+            }
+        });
     }
 
     private static <T> CompletableFuture<T> supply(RunTasks tasks, RunTasks.ThrowingSupplier<T> work) {

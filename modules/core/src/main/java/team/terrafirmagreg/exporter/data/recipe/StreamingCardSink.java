@@ -25,6 +25,7 @@ import team.terrafirmagreg.exporter.data.recipe.capture.RecipeCardSink;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
 import team.terrafirmagreg.exporter.dump.io.DumpHashes;
 import team.terrafirmagreg.exporter.dump.io.DumpImage;
+import team.terrafirmagreg.exporter.dump.io.WrittenFiles;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
 import team.terrafirmagreg.exporter.util.ExportLog;
 
@@ -105,12 +106,6 @@ final class StreamingCardSink implements RecipeCardSink {
         if (card == null || id == null || id.isBlank()) {
             return;
         }
-        ResourceId parsed;
-        try {
-            parsed = ResourceId.parse(id);
-        } catch (IllegalArgumentException ignored) {
-            return;
-        }
         int seq = accepted.getAndIncrement();
         CompletableFuture<Outcome> future = new CompletableFuture<>();
         boolean dedup;
@@ -122,6 +117,13 @@ final class StreamingCardSink implements RecipeCardSink {
         }
         try {
             scope.tasks().submitImage(() -> {
+                ResourceId parsed;
+                try {
+                    parsed = ResourceId.parse(id);
+                } catch (IllegalArgumentException ignored) {
+                    future.complete(new Outcome(id, null));
+                    return;
+                }
                 try {
                     Prepared prepared = prepare(id, parsed, category, card);
                     if (prepared.error() == null) {
@@ -186,6 +188,7 @@ final class StreamingCardSink implements RecipeCardSink {
         for (Path orphan : orphans) {
             try {
                 Files.deleteIfExists(orphan);
+                WrittenFiles.discard(orphan);
             } catch (IOException e) {
                 warnCap.warn("card shared-file cleanup {} failed: {}", orphan.getFileName(), e.toString());
             }

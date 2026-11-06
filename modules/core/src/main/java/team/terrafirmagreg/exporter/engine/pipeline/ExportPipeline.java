@@ -28,6 +28,7 @@ import team.terrafirmagreg.exporter.engine.spec.ComponentId;
 import team.terrafirmagreg.exporter.engine.spec.ExportSpec;
 import team.terrafirmagreg.exporter.storage.StoragePublish;
 import team.terrafirmagreg.exporter.util.ExportLog;
+import team.terrafirmagreg.exporter.util.RunMetrics;
 
 public final class ExportPipeline {
     private final String platform;
@@ -134,9 +135,15 @@ public final class ExportPipeline {
         });
         LinkPayload merged;
         try (ExportLog.Phase _ = ExportLog.phase(scope.metrics(), "commit")) {
+            RunMetrics.Stopwatch content = scope.metrics().start("commitContentMs");
             PipelineCommit.content(transaction, results, scope);
+            content.stop();
+            RunMetrics.Stopwatch payloadWait = scope.metrics().start("commitPayloadWaitMs");
             merged = RunTasks.await(payload);
+            payloadWait.stop();
+            RunMetrics.Stopwatch registry = scope.metrics().start("commitRegistryMs");
             registryKinds = indexCommit.apply(layout, merged, scope);
+            registry.stop();
         }
         transaction.contentCommitted();
         DumpManifest manifest;

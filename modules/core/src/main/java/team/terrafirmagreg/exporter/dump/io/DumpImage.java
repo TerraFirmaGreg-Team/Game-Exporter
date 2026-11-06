@@ -28,9 +28,11 @@ public class DumpImage {
                 bytes = WebPCodec.encodeImage(image, CARD_QUALITY * 100f);
             }
             Files.write(out, bytes);
+            WrittenFiles.record(out, bytes.length);
         } catch (IOException | RuntimeException e) {
             try {
                 Files.deleteIfExists(out);
+                WrittenFiles.discard(out);
             } catch (IOException suppressed) {
                 e.addSuppressed(suppressed);
             }

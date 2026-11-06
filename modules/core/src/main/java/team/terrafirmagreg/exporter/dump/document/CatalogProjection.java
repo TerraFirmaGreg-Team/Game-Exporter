@@ -24,6 +24,17 @@ public final class CatalogProjection {
             Map<String, ? extends Set<String>> registryKinds,
             Map<String, ? extends Set<String>> namespaceLanguages,
             Set<String> keybindNamespaces) {
+        this(catalog, requestedLanguages, registryKinds, namespaceLanguages, keybindNamespaces);
+        recipes(recipeCategories);
+        groups(groupNamespaces);
+    }
+
+    public CatalogProjection(
+            ArtifactCatalog catalog,
+            Collection<String> requestedLanguages,
+            Map<String, ? extends Set<String>> registryKinds,
+            Map<String, ? extends Set<String>> namespaceLanguages,
+            Set<String> keybindNamespaces) {
         if (requestedLanguages != null) {
             languages.addAll(requestedLanguages);
         }
@@ -32,19 +43,6 @@ public final class CatalogProjection {
                 case ArtifactAddress.Asset asset -> add(asset);
                 case ArtifactAddress.Data data -> add(data);
                 default -> {}
-            }
-        }
-        if (recipeCategories != null) {
-            for (Map.Entry<String, ? extends List<String>> e : recipeCategories.entrySet()) {
-                String ns = ResourceId.namespaceOf(e.getKey());
-                if (!ns.isEmpty()) {
-                    namespace(ns).recipes.put(e.getKey(), List.copyOf(e.getValue()));
-                }
-            }
-        }
-        if (groupNamespaces != null) {
-            for (String ns : groupNamespaces) {
-                namespace(ns).registry.add("groups");
             }
         }
         if (registryKinds != null) {
@@ -61,6 +59,27 @@ public final class CatalogProjection {
             for (String ns : keybindNamespaces) {
                 namespace(ns).keybinds = true;
             }
+        }
+    }
+
+    public void recipes(Map<String, ? extends List<String>> recipeCategories) {
+        if (recipeCategories == null) {
+            return;
+        }
+        for (Map.Entry<String, ? extends List<String>> e : recipeCategories.entrySet()) {
+            String ns = ResourceId.namespaceOf(e.getKey());
+            if (!ns.isEmpty()) {
+                namespace(ns).recipes.put(e.getKey(), List.copyOf(e.getValue()));
+            }
+        }
+    }
+
+    public void groups(Set<String> groupNamespaces) {
+        if (groupNamespaces == null) {
+            return;
+        }
+        for (String ns : groupNamespaces) {
+            namespace(ns).registry.add("groups");
         }
     }
 

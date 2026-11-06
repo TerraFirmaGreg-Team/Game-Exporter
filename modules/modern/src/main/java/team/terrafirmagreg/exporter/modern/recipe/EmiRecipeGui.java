@@ -3,12 +3,14 @@ package team.terrafirmagreg.exporter.modern.recipe;
 import com.mojang.blaze3d.systems.RenderSystem;
 import dev.emi.emi.api.recipe.EmiRecipe;
 import dev.emi.emi.api.widget.Widget;
+import dev.emi.emi.runtime.EmiDrawContext;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.experimental.UtilityClass;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.renderer.MultiBufferSource;
 import team.terrafirmagreg.exporter.data.recipe.capture.RecipeCardImage;
 import team.terrafirmagreg.exporter.modern.model.SceneCapture;
 import team.terrafirmagreg.exporter.modern.texture.OffScreenRenderer;
@@ -18,19 +20,37 @@ import team.terrafirmagreg.exporter.util.ExportLog;
 class EmiRecipeGui {
     static final int MARGIN = 4;
     private static final int CARD_SCALE_MAX = 2;
-    private static final double NON_BACKGROUND_GROWTH = 0.03;
+    static final double NON_BACKGROUND_GROWTH = 0.03;
     private static final int RETRY_LIMIT = 60;
     static final long RETRY_SLEEP_MS = 100;
     static final long STABLE_WINDOW_MS = 1500;
     static final int STABLE_FRAMES = 3;
-    private static final long EXTERNAL_WINDOW_MS = 3000;
+    static final long EXTERNAL_WINDOW_MS = 3000;
 
-    record CardCell(EmiRecipe recipe, List<Widget> widgets, Integer viewH) {}
+    record CardCell(EmiRecipe recipe, List<Widget> widgets, Integer viewH, int displayW, int displayH) {}
 
     record CardCapture(RecipeCardImage image, SceneCapture.Result scene) {}
 
+    record Canvas(GuiGraphics graphics, EmiDrawContext context, MultiBufferSource.BufferSource buffers) {
+
+        static Canvas create() {
+            Minecraft client = Minecraft.getInstance();
+            GuiGraphics graphics =
+                    new GuiGraphics(client, client.renderBuffers().bufferSource());
+            return new Canvas(
+                    graphics,
+                    EmiDrawContext.wrap(graphics),
+                    client.renderBuffers().bufferSource());
+        }
+    }
+
     static CardCapture capture(
-            OffScreenRenderer renderer, EmiRecipe recipe, List<Widget> fallbackWidgets, CardStats stats, Integer viewH)
+            Canvas canvas,
+            OffScreenRenderer renderer,
+            EmiRecipe recipe,
+            List<Widget> fallbackWidgets,
+            CardStats stats,
+            Integer viewH)
             throws Exception {
         AtomicReference<SceneCapture.Result> scene = new AtomicReference<>();
         int displayW = Math.max(1, recipe.getDisplayWidth());
@@ -45,21 +65,22 @@ class EmiRecipeGui {
             synchronized (WidgetTreeLock.LOCK) {
                 widgets = EmiCardRender.addWidgetsOnce(recipe);
                 if (EmiCardRender.containsExternalWidget(widgets)) {
-                    return captureWidgets(renderer, recipe, widgets, stats, scene, true, viewH);
+                    return captureWidgets(canvas, renderer, recipe, widgets, stats, scene, true, viewH);
                 }
             }
-            return captureWidgets(renderer, recipe, widgets, stats, scene, false, viewH);
+            return captureWidgets(canvas, renderer, recipe, widgets, stats, scene, false, viewH);
         }
         if (!EmiCardRender.containsExternalWidget(widgets)) {
-            return captureWidgets(renderer, recipe, widgets, stats, scene, false, viewH);
+            return captureWidgets(canvas, renderer, recipe, widgets, stats, scene, false, viewH);
         }
         synchronized (WidgetTreeLock.LOCK) {
             List<Widget> rebuilt = EmiCardRender.addWidgetsOnce(recipe);
-            return captureWidgets(renderer, recipe, rebuilt, stats, scene, true, viewH);
+            return captureWidgets(canvas, renderer, recipe, rebuilt, stats, scene, true, viewH);
         }
     }
 
     private static CardCapture captureWidgets(
+            Canvas canvas,
             OffScreenRenderer renderer,
             EmiRecipe recipe,
             List<Widget> widgets,
@@ -75,10 +96,8 @@ class EmiRecipeGui {
         int pixelW = pixelW(recipe, true);
         int pixelH = pixelH(displayH);
         String category = recipe.getCategory().getId().toString();
-        Minecraft client = Minecraft.getInstance();
-        GuiGraphics graphics = new GuiGraphics(client, client.renderBuffers().bufferSource());
         int[] argb = EmiCardRender.renderCard(
-                        renderer, graphics, recipe, widgets, guiW, guiH, pixelW, pixelH, stats, scene, true, viewH)
+                        canvas, renderer, recipe, widgets, guiW, guiH, pixelW, pixelH, stats, scene, true, viewH)
                 .argb();
         if (!externalWidget && EmiCardCats.sync(category) && !progressPending(scene.get())) {
             return new CardCapture(new RecipeCardImage(argb, pixelW, pixelH), scene.get());
@@ -89,7 +108,7 @@ class EmiRecipeGui {
         if (!mayMaterialize && !animated) {
             EmiCardCats.markSyncProbe(category);
             EmiCardRender.verifyGrid(
-                    renderer, graphics, recipe, widgets, guiW, guiH, pixelW, pixelH, argb, category, stats, viewH);
+                    canvas, renderer, recipe, widgets, guiW, guiH, pixelW, pixelH, argb, category, stats, viewH);
             return new CardCapture(new RecipeCardImage(argb, pixelW, pixelH), scene.get());
         }
         boolean async = EmiCardCats.async(category);
@@ -109,8 +128,8 @@ class EmiRecipeGui {
         try {
             pumpQueues();
             int[] next = EmiCardRender.renderCard(
+                            canvas,
                             renderer,
-                            graphics,
                             recipe,
                             widgets,
                             guiW,
@@ -132,7 +151,7 @@ class EmiRecipeGui {
                 } else {
                     EmiCardCats.markSyncProbe(category);
                     EmiCardRender.verifyGrid(
-                            renderer, graphics, recipe, widgets, guiW, guiH, pixelW, pixelH, next, category, stats,
+                            canvas, renderer, recipe, widgets, guiW, guiH, pixelW, pixelH, next, category, stats,
                             viewH);
                 }
                 argb = next;
@@ -152,8 +171,8 @@ class EmiRecipeGui {
                     Thread.sleep(RETRY_SLEEP_MS);
                     pumpQueues();
                     int[] cur = EmiCardRender.renderCard(
+                                    canvas,
                                     renderer,
-                                    graphics,
                                     recipe,
                                     widgets,
                                     guiW,
@@ -188,7 +207,7 @@ class EmiRecipeGui {
                     if (!async) {
                         EmiCardCats.markSyncProbe(category);
                         EmiCardRender.verifyGrid(
-                                renderer, graphics, recipe, widgets, guiW, guiH, pixelW, pixelH, argb, category, stats,
+                                canvas, renderer, recipe, widgets, guiW, guiH, pixelW, pixelH, argb, category, stats,
                                 viewH);
                     }
                 } else if (!async) {
@@ -217,7 +236,7 @@ class EmiRecipeGui {
         return new CardCapture(new RecipeCardImage(argb, pixelW, pixelH), scene.get());
     }
 
-    private static boolean progressPending(SceneCapture.Result scene) {
+    static boolean progressPending(SceneCapture.Result scene) {
         return scene != null && scene.hasProgressText();
     }
 
@@ -229,6 +248,10 @@ class EmiRecipeGui {
     static int pixelW(EmiRecipe recipe, boolean helper) {
         int displayW = Math.max(1, recipe.getDisplayWidth());
         return scaled(helper ? displayW + MARGIN * 2 : displayW);
+    }
+
+    static int pixelW(int displayWidth) {
+        return scaled(Math.max(1, displayWidth) + MARGIN * 2);
     }
 
     static int pixelH(EmiRecipe recipe, boolean helper) {

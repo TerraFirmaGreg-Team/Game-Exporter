@@ -3,6 +3,7 @@ package team.terrafirmagreg.exporter.data.quest;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Set;
+import team.terrafirmagreg.exporter.engine.run.RunScope;
 import team.terrafirmagreg.exporter.spi.CaptureSource;
 import team.terrafirmagreg.exporter.spi.MergePolicy;
 import team.terrafirmagreg.exporter.spi.SourceDescriptor;
@@ -22,6 +23,10 @@ public interface QuestSource extends CaptureSource {
     }
 
     default Set<String> langKeys(String lang) {
+        return langKeys(lang, null);
+    }
+
+    default Set<String> langKeys(String lang, RunScope scope) {
         return Set.of();
     }
 }

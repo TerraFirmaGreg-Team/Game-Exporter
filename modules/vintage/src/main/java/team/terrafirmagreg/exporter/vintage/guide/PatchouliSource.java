@@ -22,7 +22,7 @@ import team.terrafirmagreg.exporter.vintage.pack.PackFiles;
 
 public final class PatchouliSource extends GuideBookSourceBase {
 
-    private List<File> packs;
+    private volatile List<File> packs;
 
     public PatchouliSource(Minecraft client, String defaultNamespace) {
         super(defaultNamespace);

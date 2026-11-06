@@ -77,4 +77,9 @@ public final class ResourceLangSource extends ResourceLangSourceBase {
     protected Map<String, String> keybinds() {
         return Keybinds.capture(client);
     }
+
+    @Override
+    protected Object langScanOwner() {
+        return client == null ? null : client.getResourceManager();
+    }
 }
