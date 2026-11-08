@@ -95,6 +95,10 @@ class QuestRewrites {
         if (item != null && item.isObject()) {
             liftFilter((ObjectNode) item, obj);
         }
+        JsonNode ref = obj.get("ref");
+        if (ref != null && ref.isObject()) {
+            liftFilter((ObjectNode) ref, obj);
+        }
         JsonNode icon = obj.get("icon");
         if (icon != null && icon.isObject()) {
             liftFilter((ObjectNode) icon, obj);
@@ -118,6 +122,9 @@ class QuestRewrites {
             filter = JsonNodes.text(tagObj, key);
             if (filter != null) {
                 tagObj.remove(key);
+                if (tagObj.isEmpty()) {
+                    from.remove("tag");
+                }
                 break;
             }
         }

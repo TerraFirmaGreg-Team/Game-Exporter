@@ -11,6 +11,7 @@ import team.terrafirmagreg.exporter.contract.dto.quest.QuestChapter;
 import team.terrafirmagreg.exporter.contract.text.LangExtractor;
 import team.terrafirmagreg.exporter.data.quest.dump.QuestLangExtractor;
 import team.terrafirmagreg.exporter.dump.io.DumpWriter;
+import team.terrafirmagreg.exporter.engine.demand.ResourceDemand;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -117,5 +118,46 @@ class QuestChapterWriteTest {
         Path out = tmp.resolve("bad.json");
         DumpWriter.writeTreeOrValue(out, source, QuestChapter.class);
         assertEquals(source, DumpWriter.readTree(out));
+    }
+
+    @Test
+    void filterLiftsFromItemTagToTask() throws IOException {
+        ObjectNode source = (ObjectNode) DumpWriter.readTree("""
+                {
+                  "id": "chapter1",
+                  "icon": {"kind": "item", "id": "minecraft:book"},
+                  "quests": {
+                    "q1": {
+                      "id": "q1", "x": 0, "y": 0,
+                      "tasks": {
+                        "t1": {
+                          "id": "t1", "type": "item",
+                          "item": {
+                            "Count": 1,
+                            "id": "ftbfiltersystem:smart_filter",
+                            "tag": {"ftbfiltersystem:filter": "or(item(create:stressometer)item(create:speedometer))"}
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                """);
+        QuestJsonNormalize.apply(source, "tfg", ResourceDemand.builder());
+        JsonNode task = source.get("quests").get("q1").get("tasks").get("t1");
+        assertEquals(
+                "or(item(create:stressometer)item(create:speedometer))",
+                task.get("filter").asString());
+        assertNull(task.get("item"));
+        JsonNode ref = task.get("ref");
+        assertEquals("ftbfiltersystem:smart_filter", ref.get("id").asString());
+        assertNull(ref.get("tag"));
+        assertNull(ref.get("filter"));
+        Path out = tmp.resolve("filter.json");
+        DumpWriter.writeTreeOrValue(out, source, QuestChapter.class);
+        JsonNode written = DumpWriter.readTree(out);
+        assertEquals(
+                "or(item(create:stressometer)item(create:speedometer))",
+                written.get("quests").get("q1").get("tasks").get("t1").get("filter").asString());
     }
 }
