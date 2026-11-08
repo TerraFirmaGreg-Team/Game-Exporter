@@ -99,7 +99,12 @@ class StorageSyncTest {
         assertEquals("{\"a\":\"b\"}", gunzip(lang));
         assertNotNull(stored(storeRoot, "pack/1.0.0/manifest.json"));
         assertNull(stored(storeRoot, "pack/1.0.0/schema/manifest.json"));
-        assertNull(stored(storeRoot, "pack/1.0.0/manifest.json.gz"));
+        byte[] manifestGz = stored(storeRoot, "pack/1.0.0/manifest.json.gz");
+        assertNotNull(manifestGz);
+        assertEquals("{\"pack\":{}}", gunzip(manifestGz));
+        byte[] indexBytes = stored(storeRoot, "pack/1.0.0/objects.json");
+        ObjectsIndex index = DumpWriter.mapper().readValue(indexBytes, ObjectsIndex.class);
+        assertTrue(index.files().get("manifest.json").endsWith(".gz"));
     }
 
     @Test

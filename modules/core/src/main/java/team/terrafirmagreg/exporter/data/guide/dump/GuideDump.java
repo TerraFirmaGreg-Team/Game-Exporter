@@ -58,6 +58,11 @@ public class GuideDump {
                 langKeysNs.addAndGet(System.nanoTime() - start);
             }
         };
+        if (languages != null) {
+            for (String lang : languages) {
+                sharedKeys.apply(lang);
+            }
+        }
         RunMetrics.Stopwatch shape = metrics.start("shape");
         List<CompletableFuture<BookShape>> pending = new ArrayList<>();
         for (GuideBook book : snapshot.books()) {

@@ -10,6 +10,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 import lombok.experimental.UtilityClass;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.fml.ModList;
@@ -30,23 +31,22 @@ public class RemiGroups {
         try {
             StackGroupManager.reload();
             StackGroupManager.buildGroupedEmiStacksAndStackGroupToContents(stacks);
-            Map<com.evandev.remi.feature.stackgroup.data.StackGroup, EmiGroupStack> grouped =
-                    StackGroupManager.groupToGroupStacks;
-            List<com.evandev.remi.feature.stackgroup.data.StackGroup> ordered = StackGroupManager.stackGroups;
-            if (grouped == null || ordered == null || ordered.isEmpty()) {
+            var ordered = StackGroupManager.stackGroups;
+            if (ordered == null || ordered.isEmpty()) {
                 return List.of();
             }
+            Map<ResourceLocation, Set<String>> members = membersByGroup();
             Map<ResourceLocation, StackGroup> rows = new LinkedHashMap<>();
-            for (com.evandev.remi.feature.stackgroup.data.StackGroup group : ordered) {
+            for (var group : ordered) {
                 if (group == null || group.getId() == null || !group.isEnabled) {
                     continue;
                 }
-                List<String> members = membersOf(grouped.get(group), group, stacks);
-                if (members.isEmpty()) {
+                List<String> ids = membersOf(members.get(group.getId()), group::match, stacks);
+                if (ids.isEmpty()) {
                     continue;
                 }
                 DumpText name = DumpTexts.of(group.name);
-                rows.putIfAbsent(group.getId(), StackGroup.of(group.getId().toString(), name, members));
+                rows.putIfAbsent(group.getId(), StackGroup.of(group.getId().toString(), name, ids));
             }
             ExportLog.info("stack groups: {}", rows.size());
             return List.copyOf(rows.values());
@@ -56,25 +56,40 @@ public class RemiGroups {
         }
     }
 
-    private static List<String> membersOf(
-            EmiGroupStack cell, com.evandev.remi.feature.stackgroup.data.StackGroup group, List<EmiStack> stacks) {
-        Set<String> members = new LinkedHashSet<>();
-        if (cell != null) {
-            for (GroupedEmiStack<EmiStack> member : cell.getItems()) {
-                String id = EmiRecipeSource.stackId(member.realStack);
+    private static Map<ResourceLocation, Set<String>> membersByGroup() {
+        Map<ResourceLocation, Set<String>> byGroup = new LinkedHashMap<>();
+        Map<ResourceLocation, List<GroupedEmiStack<EmiStack>>> index = StackGroupManager.getItemToGroupedStacks();
+        if (index == null) {
+            return byGroup;
+        }
+        for (List<GroupedEmiStack<EmiStack>> cell : index.values()) {
+            if (cell == null) {
+                continue;
+            }
+            for (GroupedEmiStack<EmiStack> member : cell) {
+                ResourceLocation groupId =
+                        member == null || member.stackGroup == null ? null : member.stackGroup.getId();
+                String id = groupId == null ? null : EmiRecipeSource.stackId(member.realStack);
                 if (id != null) {
-                    members.add(id);
+                    byGroup.computeIfAbsent(groupId, ignored -> new LinkedHashSet<>())
+                            .add(id);
                 }
             }
         }
-        if (members.isEmpty()) {
-            for (EmiStack stack : stacks) {
-                EmiStack real = unwrap(stack);
-                if (real != null && group.match(real)) {
-                    String id = EmiRecipeSource.stackId(real);
-                    if (id != null) {
-                        members.add(id);
-                    }
+        return byGroup;
+    }
+
+    private static List<String> membersOf(Set<String> memberIds, Predicate<EmiStack> matcher, List<EmiStack> stacks) {
+        if (memberIds != null && !memberIds.isEmpty()) {
+            return new ArrayList<>(memberIds);
+        }
+        Set<String> members = new LinkedHashSet<>();
+        for (EmiStack stack : stacks) {
+            EmiStack real = unwrap(stack);
+            if (real != null && matcher.test(real)) {
+                String id = EmiRecipeSource.stackId(real);
+                if (id != null) {
+                    members.add(id);
                 }
             }
         }

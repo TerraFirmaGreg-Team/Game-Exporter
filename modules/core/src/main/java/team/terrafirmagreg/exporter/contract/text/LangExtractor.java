@@ -137,6 +137,10 @@ public final class LangExtractor {
         doc.set(field, out);
     }
 
+    public void preload(String lang) {
+        keys(lang);
+    }
+
     public Map<String, Map<String, String>> generated() {
         Map<String, Map<String, String>> out = new TreeMap<>();
         generated.forEach((lang, keys) -> out.put(lang, Collections.unmodifiableMap(new TreeMap<>(keys))));

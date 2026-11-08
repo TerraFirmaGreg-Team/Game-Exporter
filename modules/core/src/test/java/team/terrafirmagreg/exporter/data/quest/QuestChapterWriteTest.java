@@ -4,9 +4,12 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import team.terrafirmagreg.exporter.contract.dto.quest.QuestChapter;
+import team.terrafirmagreg.exporter.contract.text.LangExtractor;
+import team.terrafirmagreg.exporter.data.quest.dump.QuestLangExtractor;
 import team.terrafirmagreg.exporter.dump.io.DumpWriter;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -69,6 +72,41 @@ class QuestChapterWriteTest {
         assertEquals(
                 source.get("vendorChapterExtra"),
                 DumpWriter.mapper().valueToTree(chapter.extras().get("vendorChapterExtra")));
+    }
+
+    @Test
+    void arraySubtitleAndScalarDescriptionBindAfterLangExtract() throws IOException {
+        ObjectNode source = (ObjectNode) DumpWriter.readTree("""
+                {
+                  "id": "chapter1",
+                  "title": "Quests",
+                  "subtitle": ["Line one", "Line two"],
+                  "description": "Solo line",
+                  "icon": {"kind": "item", "id": "minecraft:book"},
+                  "quests": {
+                    "q1": {
+                      "id": "q1", "x": 0, "y": 0,
+                      "subtitle": ["Quest", "Sub"],
+                      "tasks": {"t1": {"id": "t1", "type": "item"}}
+                    }
+                  }
+                }
+                """);
+        LangExtractor extractor = new LangExtractor(lang -> Set.of());
+        QuestLangExtractor.chapter(source, "tfg", "en_us", extractor);
+        Path out = tmp.resolve("chapter.json");
+        DumpWriter.writeTreeOrValue(out, source, QuestChapter.class);
+        JsonNode written = DumpWriter.readTree(out);
+        assertEquals("{quest.tfg.chapter1.subtitle}", written.get("subtitle").asString());
+        assertEquals("Line one\nLine two", extractor.generated().get("en_us").get("quest.tfg.chapter1.subtitle"));
+        assertTrue(written.get("description").isArray());
+        assertEquals(
+                "{quest.tfg.chapter1.description.0}",
+                written.get("description").get(0).asString());
+        assertEquals(
+                "{quest.tfg.q1.subtitle}",
+                written.get("quests").get("q1").get("subtitle").asString());
+        assertEquals("Quest\nSub", extractor.generated().get("en_us").get("quest.tfg.q1.subtitle"));
     }
 
     @Test

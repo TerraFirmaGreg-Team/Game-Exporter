@@ -8,7 +8,7 @@ plugins {
 dependencies {
     modApi "dev.emi:emi-forge:${libs.versions.emi.get()}@jar"
     modApi libs.patchouli
-    modApi "maven.modrinth:reliable-emi:oadZsgpm"
+    modApi "maven.modrinth:reliable-emi:9b1U5yMI"
     compileOnly libs.mixin
     annotationProcessor "org.spongepowered:mixin:${libs.versions.mixin.get()}:processor"
 }

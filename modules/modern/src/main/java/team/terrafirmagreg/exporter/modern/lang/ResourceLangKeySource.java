@@ -2,13 +2,15 @@ package team.terrafirmagreg.exporter.modern.lang;
 
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import lombok.experimental.UtilityClass;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
@@ -18,13 +20,13 @@ import team.terrafirmagreg.exporter.assets.lang.LangNamespace;
 import team.terrafirmagreg.exporter.assets.lang.LangScanKey;
 import team.terrafirmagreg.exporter.dump.io.DumpWriter;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
-import team.terrafirmagreg.exporter.engine.run.RunTasks;
 import team.terrafirmagreg.exporter.util.ExportLog;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
 @UtilityClass
 public class ResourceLangKeySource {
+    private static final long NAMESPACE_WAIT_MS = 120_000L;
 
     public static Set<String> capture(ResourceManager assets, String language) {
         return capture(assets, language, null);
@@ -48,6 +50,7 @@ public class ResourceLangKeySource {
             return keys;
         }
         List<CompletableFuture<LangNamespace>> pending = new ArrayList<>();
+        List<String> pendingNamespaces = new ArrayList<>();
         for (String namespace : ordered) {
             pending.add(scope.tasks()
                     .supply(() -> scope.cache()
@@ -55,19 +58,28 @@ public class ResourceLangKeySource {
                                     new LangScanKey(assets, namespace, paths),
                                     LangNamespace.class,
                                     () -> readNamespace(assets, namespace, path))));
+            pendingNamespaces.add(namespace);
         }
-        for (CompletableFuture<LangNamespace> future : pending) {
-            keys.addAll(awaitNamespace(language, future));
+        for (int i = 0; i < pending.size(); i++) {
+            keys.addAll(awaitNamespace(language, pendingNamespaces.get(i), pending.get(i)));
         }
         return keys;
     }
 
-    private static Set<String> awaitNamespace(String language, CompletableFuture<LangNamespace> pending) {
+    private static Set<String> awaitNamespace(
+            String language, String namespace, CompletableFuture<LangNamespace> pending) {
         try {
-            LangNamespace read = RunTasks.await(pending);
+            LangNamespace read = pending.get(NAMESPACE_WAIT_MS, TimeUnit.MILLISECONDS);
             return read == null ? Set.of() : read.strings().keySet();
-        } catch (IOException e) {
-            ExportLog.warn("failed reading lang keys {}", language, e);
+        } catch (TimeoutException e) {
+            ExportLog.warn("lang key scan timed out {}:{} (>{}ms)", namespace, language, NAMESPACE_WAIT_MS);
+            return Set.of();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            ExportLog.warn("lang key scan interrupted {}:{}", namespace, language);
+            return Set.of();
+        } catch (ExecutionException e) {
+            ExportLog.warn("failed reading lang keys {}:{}", namespace, language, e.getCause());
             return Set.of();
         }
     }

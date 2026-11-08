@@ -2,10 +2,12 @@ package team.terrafirmagreg.exporter.data.quest.dump;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.StringJoiner;
 import lombok.experimental.UtilityClass;
 import team.terrafirmagreg.exporter.contract.text.LangExtractor;
 import team.terrafirmagreg.exporter.util.JsonNodes;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
 @UtilityClass
@@ -29,9 +31,11 @@ public class QuestLangExtractor {
         String id = JsonNodes.stringText(node, "id");
         String nodePrefix = id != null ? "quest." + namespace + "." + id : prefix;
         for (String field : SCALAR_FIELDS) {
+            joinTextLines(node, field);
             extractor.field(node, questLang, field, nodePrefix + "." + field, Map.of());
         }
         for (String field : LIST_FIELDS) {
+            wrapTextLine(node, field);
             extractor.list(node, questLang, field, nodePrefix + "." + field, Map.of());
         }
         for (var entry : node.properties()) {
@@ -51,6 +55,28 @@ public class QuestLangExtractor {
                     i++;
                 }
             }
+        }
+    }
+
+    private static void joinTextLines(ObjectNode node, String field) {
+        JsonNode value = node.get(field);
+        if (value == null || !value.isArray()) {
+            return;
+        }
+        StringJoiner joined = new StringJoiner("\n");
+        for (JsonNode element : value) {
+            if (element == null || !element.isString()) {
+                return;
+            }
+            joined.add(element.asString());
+        }
+        node.put(field, joined.toString());
+    }
+
+    private static void wrapTextLine(ObjectNode node, String field) {
+        JsonNode value = node.get(field);
+        if (value != null && value.isString()) {
+            node.set(field, JsonNodeFactory.instance.arrayNode().add(value));
         }
     }
 

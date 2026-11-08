@@ -58,6 +58,7 @@ public class QuestDump {
         ResourceDemand.Builder demand = ResourceDemand.builder();
         String questLang = languages == null || languages.isEmpty() ? "en_us" : languages.get(0);
         LangExtractor extractor = new LangExtractor(langKeys);
+        extractor.preload(questLang);
         List<ChapterSummarySource> written = new ArrayList<>();
         Path chaptersSrc = source.resolve("chapters");
         if (Files.isDirectory(chaptersSrc)) {

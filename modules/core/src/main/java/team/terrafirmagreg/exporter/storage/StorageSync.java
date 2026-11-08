@@ -20,6 +20,7 @@ import lombok.experimental.UtilityClass;
 import team.terrafirmagreg.exporter.contract.dto.storage.ObjectsIndex;
 import team.terrafirmagreg.exporter.contract.dto.storage.VersionsIndex;
 import team.terrafirmagreg.exporter.dump.DumpFiles;
+import team.terrafirmagreg.exporter.dump.DumpLayout;
 import team.terrafirmagreg.exporter.dump.io.DumpHashes;
 import team.terrafirmagreg.exporter.dump.io.DumpWriter;
 import team.terrafirmagreg.exporter.util.ExportLog;
@@ -47,6 +48,12 @@ public class StorageSync {
         for (Path file : files) {
             String rel = relativize(job.root(), file);
             if (rel == null) {
+                continue;
+            }
+            if (rel.equals(DumpLayout.MANIFEST)) {
+                index.put(rel, segmentPrefix + rel + ".gz");
+                plan.add(new Entry(file, segmentPrefix + rel, false, false));
+                plan.add(new Entry(file, segmentPrefix + rel + ".gz", true, false));
                 continue;
             }
             String namespace = namespaceOf(rel);
