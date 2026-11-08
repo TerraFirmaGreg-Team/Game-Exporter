@@ -31,7 +31,6 @@ public class StorageSync {
     public static final String OBJECTS_INDEX = "objects.json";
     private static final String CACHE_OBJECT = "public, max-age=31536000, immutable";
     private static final String CACHE_RESOLVER = "public, max-age=60";
-    private static final String CACHE_VERSIONED = "public, max-age=31536000, immutable";
     private static final int INDEX_PUTS = 2;
 
     public record Stats(int uploaded, int skipped, int deleted, long bytes) {}
@@ -104,7 +103,7 @@ public class StorageSync {
         }
         Map<String, String> indexView = new TreeMap<>(index);
         byte[] indexBytes = DumpWriter.toJsonBytes(new ObjectsIndex(indexView));
-        target.put(segmentPrefix + OBJECTS_INDEX + ".gz", gzip(indexBytes), "application/json", CACHE_VERSIONED);
+        target.put(segmentPrefix + OBJECTS_INDEX + ".gz", gzip(indexBytes), "application/json", CACHE_RESOLVER);
         writeVersionsIndex(target, job);
         int deleted = deleteOrphans(target, job, plan, segmentPrefix, options.delete());
         return new Stats(uploaded.get() + INDEX_PUTS, skipped.get(), deleted, bytes.get());
@@ -160,13 +159,7 @@ public class StorageSync {
     }
 
     private static String cacheControl(String key) {
-        if (key.contains("/objects/")) {
-            return CACHE_OBJECT;
-        }
-        if (key.endsWith(VERSIONS)) {
-            return CACHE_RESOLVER;
-        }
-        return CACHE_VERSIONED;
+        return key.contains("/objects/") ? CACHE_OBJECT : CACHE_RESOLVER;
     }
 
     private static void writeVersionsIndex(StorageTarget target, StorageJob job) throws IOException {
