@@ -72,9 +72,10 @@ class StorageSyncTest {
         List<String> keys = target.listKeys("pack/");
         assertTrue(keys.stream().anyMatch(k -> k.startsWith("pack/objects/tfc/") && k.endsWith(".json.gz")));
         assertTrue(keys.stream().anyMatch(k -> k.startsWith("pack/objects/tfc/") && k.endsWith(".webp")));
-        assertTrue(keys.contains("pack/1.0.0/objects.json"));
-        byte[] indexBytes = stored(storeRoot, "pack/1.0.0/objects.json");
-        ObjectsIndex index = DumpWriter.mapper().readValue(indexBytes, ObjectsIndex.class);
+        assertTrue(keys.contains("pack/1.0.0/objects.json.gz"));
+        assertTrue(keys.stream().noneMatch(k -> k.endsWith("/objects.json")));
+        ObjectsIndex index = DumpWriter.mapper()
+                .readValue(gunzip(stored(storeRoot, "pack/1.0.0/objects.json.gz")), ObjectsIndex.class);
         assertTrue(index.files().get("data/tfc/items/x.json").startsWith("pack/objects/tfc/"));
         assertTrue(index.files().get("assets/tfc/textures/a.webp").startsWith("pack/objects/tfc/"));
         assertTrue(index.files().get("lang/en_us.json").endsWith(".gz"));
@@ -97,13 +98,13 @@ class StorageSyncTest {
         byte[] lang = stored(storeRoot, "pack/1.0.0/lang/en_us.json.gz");
         assertNotNull(lang);
         assertEquals("{\"a\":\"b\"}", gunzip(lang));
-        assertNotNull(stored(storeRoot, "pack/1.0.0/manifest.json"));
+        assertNull(stored(storeRoot, "pack/1.0.0/manifest.json"));
         assertNull(stored(storeRoot, "pack/1.0.0/schema/manifest.json"));
         byte[] manifestGz = stored(storeRoot, "pack/1.0.0/manifest.json.gz");
         assertNotNull(manifestGz);
         assertEquals("{\"pack\":{}}", gunzip(manifestGz));
-        byte[] indexBytes = stored(storeRoot, "pack/1.0.0/objects.json");
-        ObjectsIndex index = DumpWriter.mapper().readValue(indexBytes, ObjectsIndex.class);
+        ObjectsIndex index = DumpWriter.mapper()
+                .readValue(gunzip(stored(storeRoot, "pack/1.0.0/objects.json.gz")), ObjectsIndex.class);
         assertTrue(index.files().get("manifest.json").endsWith(".gz"));
     }
 
