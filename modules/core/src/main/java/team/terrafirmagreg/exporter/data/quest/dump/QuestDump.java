@@ -130,10 +130,18 @@ public class QuestDump {
                 count = quests.size();
             }
             TaggedReference icon = IconNormalize.tagged(tree.get("icon"));
+            JsonNode orderNode = tree.get("orderIndex");
+            Integer orderIndex = orderNode != null && orderNode.isNumber() ? orderNode.asInt() : null;
             chapters.put(
                     key,
                     new QuestChapterSummary(
-                            id, "chapters/" + chapter.relative(), JsonNodes.text(tree, "title"), icon, count));
+                            id,
+                            "chapters/" + chapter.relative(),
+                            JsonNodes.text(tree, "title"),
+                            icon,
+                            count,
+                            JsonNodes.text(tree, "group"),
+                            orderIndex));
         }
         return chapters;
     }

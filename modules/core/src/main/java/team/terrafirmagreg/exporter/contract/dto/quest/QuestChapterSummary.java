@@ -8,4 +8,6 @@ public record QuestChapterSummary(
         String file,
         @JsonInclude(JsonInclude.Include.NON_NULL) String title,
         @JsonInclude(JsonInclude.Include.NON_NULL) TaggedReference icon,
-        int count) {}
+        int count,
+        @JsonInclude(JsonInclude.Include.NON_NULL) String group,
+        @JsonInclude(JsonInclude.Include.NON_NULL) Integer orderIndex) {}

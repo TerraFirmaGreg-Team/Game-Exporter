@@ -21,6 +21,7 @@ import team.terrafirmagreg.exporter.modern.mixin.EmiTextureWidgetAccessor;
 import team.terrafirmagreg.exporter.modern.model.SceneCapture;
 import team.terrafirmagreg.exporter.modern.texture.CaptureScissor;
 import team.terrafirmagreg.exporter.modern.texture.OffScreenRenderer;
+import team.terrafirmagreg.exporter.modern.texture.RenderFreeze;
 import team.terrafirmagreg.exporter.util.ExportLog;
 
 @UtilityClass
@@ -142,7 +143,12 @@ class EmiCardRender {
         setup.run();
         stats.fboNs += System.nanoTime() - setupStart;
         try {
-            draw.run();
+            RenderFreeze.begin();
+            try {
+                draw.run();
+            } finally {
+                RenderFreeze.end();
+            }
         } finally {
             long endStart = System.nanoTime();
             CaptureScissor.end();

@@ -21,7 +21,9 @@
         "EmiAgnosMixin",
         "EmiListIngredientMixin",
         "EmiGeneratedSlotMixin",
-        "ClientTextTooltipAccessor"
+        "ClientTextTooltipAccessor",
+        "UtilFreezeMixin",
+        "LevelFreezeMixin"
     ],
     "refmap": "exporter.mixins.refmap.json",
     "required": true
