@@ -3,22 +3,47 @@ package team.terrafirmagreg.exporter.util;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import lombok.experimental.UtilityClass;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import team.terrafirmagreg.exporter.engine.report.RunMetrics;
 
 @UtilityClass
 public class ExportLog {
-    public static final ScopedValue<String> COMPONENT = ScopedValue.newInstance();
+    private static final ThreadLocal<String> COMPONENT = new ThreadLocal<>();
     private static final Logger LOGGER = LogManager.getLogger("GameExporter");
     private static final String DEFAULT_TAG = "export";
     private static final long PROGRESS_MIN_INTERVAL_MS = 1_000L;
     private static final int PROGRESS_MIN_PERCENT_STEP = 5;
 
+    public static String component() {
+        return COMPONENT.get();
+    }
+
+    public static <T> T withComponent(String component, Callable<T> body) throws Exception {
+        String previous = COMPONENT.get();
+        if (component == null) {
+            COMPONENT.remove();
+        } else {
+            COMPONENT.set(component);
+        }
+        try {
+            return body.call();
+        } finally {
+            if (previous == null) {
+                COMPONENT.remove();
+            } else {
+                COMPONENT.set(previous);
+            }
+        }
+    }
+
     private static String tag() {
-        return COMPONENT.isBound() ? COMPONENT.get() : DEFAULT_TAG;
+        String component = COMPONENT.get();
+        return component != null ? component : DEFAULT_TAG;
     }
 
     private static String prefixed(String fmt) {

@@ -14,7 +14,6 @@ import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.function.Function;
 import lombok.experimental.UtilityClass;
-import team.terrafirmagreg.exporter.contract.artifact.ArtifactAddress;
 import team.terrafirmagreg.exporter.contract.dto.quest.QuestBookData;
 import team.terrafirmagreg.exporter.contract.dto.quest.QuestChapter;
 import team.terrafirmagreg.exporter.contract.dto.quest.QuestChapterGroups;
@@ -23,25 +22,25 @@ import team.terrafirmagreg.exporter.contract.ref.TaggedReference;
 import team.terrafirmagreg.exporter.contract.schema.DumpSchemas;
 import team.terrafirmagreg.exporter.contract.text.LangAdditions;
 import team.terrafirmagreg.exporter.contract.text.LangExtractor;
-import team.terrafirmagreg.exporter.data.icon.IconNormalize;
 import team.terrafirmagreg.exporter.data.quest.QuestNormalize;
+import team.terrafirmagreg.exporter.data.stack.IconNormalize;
 import team.terrafirmagreg.exporter.dump.DataPaths;
 import team.terrafirmagreg.exporter.dump.DumpFiles;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
 import team.terrafirmagreg.exporter.dump.DumpPaths;
-import team.terrafirmagreg.exporter.dump.io.DumpWriter;
+import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
+import team.terrafirmagreg.exporter.dump.io.DumpJson;
 import team.terrafirmagreg.exporter.engine.demand.DemandExtractor;
 import team.terrafirmagreg.exporter.engine.demand.ResourceDemand;
-import team.terrafirmagreg.exporter.engine.pipeline.WriteResult;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
 import team.terrafirmagreg.exporter.util.JsonNodes;
-import team.terrafirmagreg.exporter.util.SnbtFiles;
+import team.terrafirmagreg.exporter.util.snbt.SnbtFiles;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
 @UtilityClass
 public class QuestDump {
-    public static WriteResult copyIntoDump(
+    public static ResourceDemand copyIntoDump(
             Path source,
             DumpLayout layout,
             String questNamespace,
@@ -54,7 +53,6 @@ public class QuestDump {
         Path questRoot = DataPaths.questRoot(layout, questNamespace);
         Path chaptersDest = questRoot.resolve("chapters");
         Files.createDirectories(chaptersDest);
-        List<ArtifactAddress> artifacts = new ArrayList<>();
         ResourceDemand.Builder demand = ResourceDemand.builder();
         String questLang = languages == null || languages.isEmpty() ? "en_us" : languages.get(0);
         LangExtractor extractor = new LangExtractor(langKeys);
@@ -62,7 +60,8 @@ public class QuestDump {
         List<ChapterSummarySource> written = new ArrayList<>();
         Path chaptersSrc = source.resolve("chapters");
         if (Files.isDirectory(chaptersSrc)) {
-            artifacts.addAll(copyTree(
+            copyTree(
+                    layout,
                     chaptersSrc,
                     chaptersDest,
                     questNamespace,
@@ -71,33 +70,30 @@ public class QuestDump {
                     extractor,
                     demand,
                     written,
-                    scope));
+                    scope);
         }
         Map<String, QuestChapterSummary> chapterSummaries = chapterSummaries(written);
-        Path dataJson = questRoot.resolve("data.json");
         QuestBookData data = QuestBookDump.bookData(
                 normalizedRoot(source, "data", questNamespace, normalizer, demand),
                 questNamespace,
                 questLang,
                 extractor,
                 chapterSummaries);
-        DumpWriter.writeJson(dataJson, data);
-        artifacts.add(questAddress(questNamespace, "data.json"));
-        DemandExtractor.fromElement(DumpWriter.readTree(dataJson), demand);
+        layout.writeJson(questAddress(questNamespace, "data.json"), data);
+        DemandExtractor.fromElement(DumpJson.readTree(questRoot.resolve("data.json")), demand);
         Path groupsJson = questRoot.resolve("chapter_groups.json");
         QuestChapterGroups groups = QuestBookDump.chapterGroups(
                 normalizedRoot(source, "chapter_groups", questNamespace, normalizer, demand),
                 questNamespace,
                 questLang,
                 extractor);
-        DumpWriter.writeJson(groupsJson, groups);
-        artifacts.add(questAddress(questNamespace, "chapter_groups.json"));
-        DemandExtractor.fromElement(DumpWriter.readTree(groupsJson), demand);
+        layout.writeJson(questAddress(questNamespace, "chapter_groups.json"), groups);
+        DemandExtractor.fromElement(DumpJson.readTree(groupsJson), demand);
         QuestDemandBuilder.demandFromChapters(chaptersDest, demand);
         if (extras != null) {
             extras.putAll(questNamespace, extractor.generated());
         }
-        return new WriteResult(demand.build(), List.copyOf(artifacts));
+        return demand.build();
     }
 
     private static JsonNode normalizedRoot(
@@ -146,7 +142,8 @@ public class QuestDump {
         return chapters;
     }
 
-    private static List<ArtifactAddress> copyTree(
+    private static void copyTree(
+            DumpLayout layout,
             Path source,
             Path destination,
             String questNamespace,
@@ -159,7 +156,6 @@ public class QuestDump {
             throws IOException {
         Files.createDirectories(destination);
         List<Future<?>> writes = new ArrayList<>();
-        List<String> writtenFiles = new ArrayList<>();
         Object demandLock = new Object();
         Files.walkFileTree(source, new SimpleFileVisitor<>() {
             @Override
@@ -180,10 +176,8 @@ public class QuestDump {
                 String name = file.getFileName().toString();
                 if (name.endsWith(".snbt") || name.endsWith(".json")) {
                     String jsonRelative = DumpFiles.stripExtension(relativePath) + ".json";
-                    Path output = DumpPaths.resolveUnder(destination, jsonRelative);
-                    Files.createDirectories(output.getParent());
                     writes.add(scope.tasks().submit(() -> {
-                        JsonNode tree = name.endsWith(".snbt") ? SnbtFiles.parse(file) : DumpWriter.readTree(file);
+                        JsonNode tree = name.endsWith(".snbt") ? SnbtFiles.parse(file) : DumpJson.readTree(file);
                         if (tree instanceof ObjectNode object) {
                             IconNormalize.rewrite(object);
                             ResourceDemand.Builder local = ResourceDemand.builder();
@@ -194,33 +188,23 @@ public class QuestDump {
                             object.put("schema", DumpSchemas.QUEST_CHAPTER);
                             synchronized (demandLock) {
                                 written.add(new ChapterSummarySource(jsonRelative, object));
-                                writtenFiles.add("chapters/" + jsonRelative);
                                 demand.merge(local.build());
                             }
-                            DumpWriter.writeTreeOrValue(output, object, QuestChapter.class);
+                            layout.writeJson(
+                                    questAddress(questNamespace, "chapters/" + jsonRelative),
+                                    layout.writer().mapper().treeToValue(object, QuestChapter.class));
                         } else if (tree != null) {
-                            synchronized (demandLock) {
-                                writtenFiles.add("chapters/" + jsonRelative);
-                            }
-                            DumpWriter.writeJson(output, tree);
+                            layout.writeJson(questAddress(questNamespace, "chapters/" + jsonRelative), tree);
                         }
                     }));
                     return FileVisitResult.CONTINUE;
                 }
                 Path target = DumpPaths.resolveUnder(destination, relativePath);
                 writes.add(scope.tasks().submit(() -> DumpFiles.copy(file, target)));
-                synchronized (demandLock) {
-                    writtenFiles.add("chapters/" + relativePath);
-                }
                 return FileVisitResult.CONTINUE;
             }
         });
         scope.tasks().drain(writes);
-        List<ArtifactAddress> artifacts = new ArrayList<>();
-        for (String relative : writtenFiles) {
-            artifacts.add(questAddress(questNamespace, relative));
-        }
-        return artifacts;
     }
 
     private static ArtifactAddress.Data questAddress(String namespace, String relative) {

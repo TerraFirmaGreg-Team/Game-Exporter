@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import lombok.experimental.UtilityClass;
-import team.terrafirmagreg.exporter.dump.io.DumpWriter;
+import team.terrafirmagreg.exporter.dump.io.DumpJson;
 import team.terrafirmagreg.exporter.engine.demand.ResourceDemand;
 import team.terrafirmagreg.exporter.util.JsonNodes;
 import tools.jackson.databind.JsonNode;
@@ -53,10 +53,10 @@ class QuestRewrites {
         if (shapes.isEmpty() || root.has("shapeTextures")) {
             return;
         }
-        ObjectNode map = DumpWriter.mapper().createObjectNode();
+        ObjectNode map = DumpJson.mapper().createObjectNode();
         for (var entry : shapes.entrySet()) {
             String base = entry.getValue();
-            ObjectNode layers = DumpWriter.mapper().createObjectNode();
+            ObjectNode layers = DumpJson.mapper().createObjectNode();
             layers.put("shape", base + "shape.png");
             layers.put("background", base + "background.png");
             layers.put("outline", base + "outline.png");
@@ -172,7 +172,7 @@ class QuestRewrites {
     }
 
     private static ObjectNode textureIcon(String id) {
-        ObjectNode icon = DumpWriter.mapper().createObjectNode();
+        ObjectNode icon = DumpJson.mapper().createObjectNode();
         icon.put("kind", "texture");
         icon.put("id", id);
         return icon;

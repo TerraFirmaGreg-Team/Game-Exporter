@@ -8,12 +8,12 @@ import net.minecraft.network.chat.Component;
 import net.minecraftforge.client.event.RegisterClientCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import team.terrafirmagreg.exporter.engine.live.CommandReply;
-import team.terrafirmagreg.exporter.engine.live.LiveExportWiringBase;
+import team.terrafirmagreg.exporter.engine.live.LiveExport;
 
 public final class ExportClientCommands {
-    private final LiveExportWiringBase<?> dump;
+    private final LiveExport<?> dump;
 
-    public ExportClientCommands(LiveExportWiringBase<?> dump) {
+    public ExportClientCommands(LiveExport<?> dump) {
         this.dump = dump;
     }
 

@@ -5,7 +5,7 @@ import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 import team.terrafirmagreg.exporter.assets.atlas.ArgbImage;
 import team.terrafirmagreg.exporter.assets.atlas.CaptureMetrics;
-import team.terrafirmagreg.exporter.util.RunMetrics;
+import team.terrafirmagreg.exporter.engine.report.RunMetrics;
 
 public abstract class OffScreenRendererBase implements AutoCloseable {
     private final IntBuffer pixels;

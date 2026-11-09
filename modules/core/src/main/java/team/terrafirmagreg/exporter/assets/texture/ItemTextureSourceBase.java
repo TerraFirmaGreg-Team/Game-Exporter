@@ -10,13 +10,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Future;
 import team.terrafirmagreg.exporter.assets.atlas.capture.AtlasSprite;
-import team.terrafirmagreg.exporter.contract.artifact.ArtifactAddress;
 import team.terrafirmagreg.exporter.contract.id.ResourceId;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
 import team.terrafirmagreg.exporter.engine.demand.ResourceDemand;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
 import team.terrafirmagreg.exporter.engine.spec.options.ComponentScope;
-import team.terrafirmagreg.exporter.spi.CapturedArtifact;
 
 public abstract class ItemTextureSourceBase implements TextureSource {
 
@@ -122,13 +120,8 @@ public abstract class ItemTextureSourceBase implements TextureSource {
                 || (plan.textures().isEmpty() && plan.textureAliases().isEmpty())) {
             return CopiedTextures.empty();
         }
-        List<ArtifactAddress> artifacts = new ArrayList<>();
-        int copied = copyTextures(scope, assets, layout, plan.textures(), plan.textureAliases(), artifacts);
-        List<CapturedArtifact> captures = new ArrayList<>(artifacts.size());
-        for (ArtifactAddress artifact : artifacts) {
-            captures.add(new CapturedArtifact(artifact, new byte[0]));
-        }
-        return new CopiedTextures(captures, copied);
+        int copied = copyTextures(scope, assets, layout, plan.textures(), plan.textureAliases());
+        return new CopiedTextures(List.of(), copied);
     }
 
     @Override
@@ -165,8 +158,7 @@ public abstract class ItemTextureSourceBase implements TextureSource {
             TextureCopy.ResourceReader assets,
             DumpLayout layout,
             Set<String> textureIds,
-            Map<String, String> textureAliases,
-            List<ArtifactAddress> artifacts)
+            Map<String, String> textureAliases)
             throws IOException {
         Set<String> toCopy = new LinkedHashSet<>(textureIds);
         if (textureAliases != null) {
@@ -180,10 +172,9 @@ public abstract class ItemTextureSourceBase implements TextureSource {
             if (plan == null) {
                 continue;
             }
-            Future<?> write = scope.tasks().submit(() -> TextureCopy.writePlannedTexture(plan));
+            Future<?> write = scope.tasks().submit(() -> TextureCopy.writePlannedTexture(plan, layout));
             writeByOut.put(plan.out(), write);
             writes.add(write);
-            artifacts.add(TextureCopy.address(layout, plan.out(), false));
             planned++;
         }
         if (textureAliases != null && !textureAliases.isEmpty()) {
@@ -195,7 +186,6 @@ public abstract class ItemTextureSourceBase implements TextureSource {
                     }
                     TextureCopy.aliasTexture(layout, e.getValue(), e.getKey());
                 }));
-                artifacts.add(TextureCopy.address(layout, layout.textureFromId(e.getKey()), false));
                 planned++;
             }
         }

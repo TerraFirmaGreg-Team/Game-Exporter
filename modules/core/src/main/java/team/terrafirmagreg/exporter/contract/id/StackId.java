@@ -1,8 +1,8 @@
 package team.terrafirmagreg.exporter.contract.id;
 
 import lombok.experimental.UtilityClass;
-import team.terrafirmagreg.exporter.util.CanonicalSnbt;
-import team.terrafirmagreg.exporter.util.SnbtToJson;
+import team.terrafirmagreg.exporter.util.snbt.CanonicalSnbt;
+import team.terrafirmagreg.exporter.util.snbt.SnbtToJson;
 import tools.jackson.databind.JsonNode;
 
 @UtilityClass

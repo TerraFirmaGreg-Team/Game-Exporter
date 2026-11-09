@@ -4,6 +4,8 @@ import java.nio.file.Path;
 import java.util.Set;
 import java.util.TreeSet;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiMainMenu;
+import net.minecraft.client.gui.GuiWorldSelection;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraftforge.fml.common.Loader;
 import team.terrafirmagreg.exporter.assets.lang.LangComponent;
@@ -15,12 +17,12 @@ import team.terrafirmagreg.exporter.data.quest.QuestComponent;
 import team.terrafirmagreg.exporter.data.quest.QuestPaths;
 import team.terrafirmagreg.exporter.data.recipe.RecipeComponent;
 import team.terrafirmagreg.exporter.data.registry.RegistryComponent;
-import team.terrafirmagreg.exporter.data.registry.dump.RegistryCommit;
+import team.terrafirmagreg.exporter.data.registry.dump.RegistryLinkStep;
 import team.terrafirmagreg.exporter.data.tab.TabComponent;
 import team.terrafirmagreg.exporter.data.tag.TagComponent;
-import team.terrafirmagreg.exporter.engine.live.LiveExportWiringBase;
-import team.terrafirmagreg.exporter.engine.pipeline.ExportPipeline;
-import team.terrafirmagreg.exporter.engine.spec.ComponentId;
+import team.terrafirmagreg.exporter.engine.live.LiveExport;
+import team.terrafirmagreg.exporter.engine.run.ExportPipeline;
+import team.terrafirmagreg.exporter.engine.spec.ComponentKeys;
 import team.terrafirmagreg.exporter.spi.PlatformCapabilities;
 import team.terrafirmagreg.exporter.vintage.category.JeiRecipeCategorySource;
 import team.terrafirmagreg.exporter.vintage.guide.PatchouliSource;
@@ -35,9 +37,9 @@ import team.terrafirmagreg.exporter.vintage.tab.JeiTabSource;
 import team.terrafirmagreg.exporter.vintage.tag.OreDictTagSource;
 import team.terrafirmagreg.exporter.vintage.texture.ItemTextureSource;
 
-public final class LiveDump extends LiveExportWiringBase<Minecraft> {
+public final class LiveDump extends LiveExport<Minecraft> {
     private static final PlatformCapabilities CAPABILITIES =
-            new PlatformCapabilities(Set.of(ComponentId.ASSETS_MODELS.dotted()));
+            new PlatformCapabilities(Set.of(ComponentKeys.ASSETS_MODELS.dotted()));
 
     @Override
     protected Path gameDir() {
@@ -69,7 +71,7 @@ public final class LiveDump extends LiveExportWiringBase<Minecraft> {
         JeiRecipeSource recipes = new JeiRecipeSource();
         JeiStackSource stacks = new JeiStackSource();
         return new ExportPipeline("vintage", "1.12.2")
-                .indexCommit(RegistryCommit::apply)
+                .epilogue(RegistryLinkStep::apply)
                 .add(new RegistryComponent(EntryKind.ITEM)
                         .addSource(new ForgeRegistrySource(EntryKind.ITEM))
                         .addStackSource(stacks))
@@ -90,5 +92,40 @@ public final class LiveDump extends LiveExportWiringBase<Minecraft> {
                         .addSource(new ResourceLangSource(client))
                         .addModSource(new ForgeModIndexSource()))
                 .add(new TextureComponent().addSource(new ItemTextureSource(client)));
+    }
+
+    @Override
+    protected boolean inWorld(Minecraft client) {
+        return client.player != null && client.world != null;
+    }
+
+    @Override
+    protected boolean idleMenuReady(Minecraft client) {
+        if (client.world != null || client.player != null) {
+            return false;
+        }
+        return client.currentScreen instanceof GuiMainMenu
+                || client.currentScreen instanceof GuiWorldSelection
+                || client.currentScreen == null;
+    }
+
+    @Override
+    protected boolean levelExists(Minecraft client, String saveName) {
+        return client.getSaveLoader().canLoadWorld(saveName);
+    }
+
+    @Override
+    protected void openWorld(Minecraft client, String saveName) {
+        client.launchIntegratedServer(saveName, saveName, null);
+    }
+
+    @Override
+    protected void createWorld(Minecraft client, String saveName) {
+        ExportWorldCreator.createWorld(client, saveName);
+    }
+
+    @Override
+    protected void stopClient(Minecraft client) {
+        client.shutdown();
     }
 }

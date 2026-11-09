@@ -11,6 +11,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import team.terrafirmagreg.exporter.contract.id.ResourceId;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
+import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
 import team.terrafirmagreg.exporter.modern.ItemStackIds;
 import team.terrafirmagreg.exporter.modern.model.GlbWriter;
@@ -81,7 +82,12 @@ final class SceneGlbWrite {
                         int variant = glbVariants.merge(parsed.namespace() + ":" + base, 1, Integer::sum) - 1;
                         String name = variant == 0 ? base : base + "~" + variant;
                         pending.add(new GuideMultiblocks.PendingGlb(
-                                layout.multiblock(parsed.namespace(), "recipe/" + name), mesh));
+                                new ArtifactAddress.Asset(
+                                        parsed.namespace(),
+                                        parsed.namespace() + ":multiblock/recipe/" + name + ".glb",
+                                        ArtifactAddress.AssetKind.MODEL),
+                                layout.multiblock(parsed.namespace(), "recipe/" + name),
+                                mesh));
                         rel = "assets/" + parsed.namespace() + "/multiblock/recipe/" + name + ".glb";
                         glbByContent.put(contentHash, rel);
                     }

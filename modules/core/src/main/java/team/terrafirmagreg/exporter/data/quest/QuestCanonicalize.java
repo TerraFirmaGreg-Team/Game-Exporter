@@ -3,10 +3,10 @@ package team.terrafirmagreg.exporter.data.quest;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.experimental.UtilityClass;
-import team.terrafirmagreg.exporter.dump.io.DumpWriter;
+import team.terrafirmagreg.exporter.dump.io.DumpJson;
 import team.terrafirmagreg.exporter.engine.demand.DemandIds;
 import team.terrafirmagreg.exporter.util.JsonNodes;
-import team.terrafirmagreg.exporter.util.SnbtToJson;
+import team.terrafirmagreg.exporter.util.snbt.SnbtToJson;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -44,7 +44,7 @@ class QuestCanonicalize {
         if (list == null || !list.isArray()) {
             return;
         }
-        ObjectNode byId = DumpWriter.mapper().createObjectNode();
+        ObjectNode byId = DumpJson.mapper().createObjectNode();
         int index = 0;
         for (JsonNode element : list) {
             String id = element instanceof ObjectNode e ? JsonNodes.text(e, "id") : null;
@@ -103,7 +103,7 @@ class QuestCanonicalize {
         if (list == null || !list.isArray()) {
             return;
         }
-        var items = DumpWriter.mapper().createArrayNode();
+        var items = DumpJson.mapper().createArrayNode();
         for (JsonNode element : list) {
             JsonNode ref = toRef(element, "item");
             if (ref != null) {
@@ -133,7 +133,7 @@ class QuestCanonicalize {
             if (raw.isEmpty()) {
                 return null;
             }
-            ObjectNode ref = DumpWriter.mapper().createObjectNode();
+            ObjectNode ref = DumpJson.mapper().createObjectNode();
             ref.put("kind", kind);
             ref.put("id", raw);
             if (tag != null) {
@@ -161,7 +161,7 @@ class QuestCanonicalize {
                 id = tagId;
             }
         }
-        ObjectNode ref = DumpWriter.mapper().createObjectNode();
+        ObjectNode ref = DumpJson.mapper().createObjectNode();
         ref.put("kind", refKind);
         ref.put("id", id);
         JsonNode tag = src.get("tag");

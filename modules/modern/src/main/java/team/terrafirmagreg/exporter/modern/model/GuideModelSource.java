@@ -12,10 +12,10 @@ import net.minecraft.client.Minecraft;
 import team.terrafirmagreg.exporter.assets.model.ModelCaptureRequest;
 import team.terrafirmagreg.exporter.assets.model.ModelSnapshot;
 import team.terrafirmagreg.exporter.assets.model.ModelSource;
-import team.terrafirmagreg.exporter.contract.artifact.ArtifactAddress;
 import team.terrafirmagreg.exporter.contract.id.ResourceId;
 import team.terrafirmagreg.exporter.dump.DumpFiles;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
+import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
 import team.terrafirmagreg.exporter.engine.demand.ResourceDemand;
 import team.terrafirmagreg.exporter.spi.CapturedArtifact;
 
@@ -61,11 +61,6 @@ public final class GuideModelSource implements ModelSource {
                 } else if (path.startsWith("multiblock/")) {
                     address = new ArtifactAddress.Asset(
                             namespace, namespace + ":" + path, ArtifactAddress.AssetKind.MODEL);
-                } else if (path.startsWith("atlases/") && path.endsWith(".json")) {
-                    address = new ArtifactAddress.Asset(
-                            namespace,
-                            path.substring("atlases/".length(), path.length() - ".json".length()),
-                            ArtifactAddress.AssetKind.ATLAS);
                 } else if (path.startsWith("textures/") && path.endsWith(".webp")) {
                     address = new ArtifactAddress.Asset(
                             namespace,

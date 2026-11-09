@@ -8,16 +8,13 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexSorting;
 import java.nio.IntBuffer;
-import java.nio.file.Path;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.FogRenderer;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
-import team.terrafirmagreg.exporter.assets.atlas.ArgbImage;
 import team.terrafirmagreg.exporter.assets.atlas.CaptureMetrics;
 import team.terrafirmagreg.exporter.assets.texture.OffScreenRendererBase;
-import team.terrafirmagreg.exporter.dump.io.DumpImage;
 
 public final class OffScreenRenderer extends OffScreenRendererBase {
     private final TextureTarget frameBuffer;
@@ -55,14 +52,6 @@ public final class OffScreenRenderer extends OffScreenRendererBase {
             runnable.run();
             RenderSystem.disableScissor();
         });
-    }
-
-    public void capturePng(Path path, Runnable runnable) throws Exception {
-        captureImage(path, runnable);
-    }
-
-    public void captureImage(Path path, Runnable runnable) throws Exception {
-        DumpImage.write(path, ArgbImage.fromArgb(captureArgb(runnable), width(), height()));
     }
 
     public void setupItemRendering() {

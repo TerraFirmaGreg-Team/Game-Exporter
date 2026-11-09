@@ -7,7 +7,6 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
-import team.terrafirmagreg.exporter.config.ExportConfig;
 import team.terrafirmagreg.exporter.util.ExportLog;
 
 @Mod(
@@ -26,8 +25,7 @@ public final class GameExporterMod {
     public void init(FMLInitializationEvent event) {
         MinecraftForge.EVENT_BUS.register(this);
         ExportClientCommands.register(dump);
-        ExportLog.tagged("boot")
-                .info("Game-Exporter vintage loaded (exitAfterDump={})", ExportConfig.live.exitAfterDump.get());
+        ExportLog.tagged("boot").info("Game-Exporter vintage loaded");
     }
 
     @SubscribeEvent

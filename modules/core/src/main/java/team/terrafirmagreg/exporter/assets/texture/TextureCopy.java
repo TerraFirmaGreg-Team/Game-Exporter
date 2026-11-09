@@ -10,14 +10,11 @@ import java.nio.file.StandardCopyOption;
 import java.util.List;
 import javax.imageio.ImageIO;
 import lombok.experimental.UtilityClass;
-import team.terrafirmagreg.exporter.contract.artifact.ArtifactAddress;
 import team.terrafirmagreg.exporter.contract.id.ResourceId;
 import team.terrafirmagreg.exporter.dump.DumpFiles;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
-import team.terrafirmagreg.exporter.dump.io.ArtifactDigest;
-import team.terrafirmagreg.exporter.dump.io.ArtifactDigestCache;
+import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
 import team.terrafirmagreg.exporter.dump.io.DumpImage;
-import team.terrafirmagreg.exporter.dump.io.WrittenFiles;
 import team.terrafirmagreg.exporter.util.ExportLog;
 
 @UtilityClass
@@ -78,9 +75,8 @@ public class TextureCopy {
         }
     }
 
-    public static boolean writePlannedTexture(CopyPlan plan) {
+    public static boolean writePlannedTexture(CopyPlan plan, DumpLayout layout) {
         try {
-            Files.createDirectories(plan.out().getParent());
             BufferedImage decoded;
             try (InputStream in = new ByteArrayInputStream(plan.pngBytes())) {
                 decoded = ImageIO.read(in);
@@ -88,7 +84,9 @@ public class TextureCopy {
             if (decoded == null) {
                 return false;
             }
-            DumpImage.write(plan.out(), DumpImage.maybeTrimGuiBook(decoded, plan.gamePath()));
+            layout.write(
+                    address(layout, plan.out()),
+                    DumpImage.encode(DumpImage.maybeTrimGuiBook(decoded, plan.gamePath())));
             if (plan.metaOut() != null && plan.metaBytes() != null) {
                 DumpFiles.write(plan.metaOut(), plan.metaBytes());
             }
@@ -106,22 +104,12 @@ public class TextureCopy {
             if (!Files.isRegularFile(src)) {
                 return false;
             }
-            Files.createDirectories(dest.getParent());
-            Files.copy(src, dest, StandardCopyOption.REPLACE_EXISTING);
-            WrittenFiles.record(dest, Files.size(dest));
-            ArtifactDigest srcDigest = ArtifactDigestCache.lookup(src);
-            if (srcDigest != null) {
-                ArtifactDigestCache.remember(dest, srcDigest);
-            }
+            layout.write(address(layout, dest), Files.readAllBytes(src));
             Path srcMeta = src.resolveSibling(src.getFileName().toString() + ".mcmeta");
             if (Files.isRegularFile(srcMeta)) {
                 Path destMeta = dest.resolveSibling(dest.getFileName().toString() + ".mcmeta");
+                Files.createDirectories(destMeta.getParent());
                 Files.copy(srcMeta, destMeta, StandardCopyOption.REPLACE_EXISTING);
-                WrittenFiles.record(destMeta, Files.size(destMeta));
-                ArtifactDigest metaDigest = ArtifactDigestCache.lookup(srcMeta);
-                if (metaDigest != null) {
-                    ArtifactDigestCache.remember(destMeta, metaDigest);
-                }
             }
             return true;
         } catch (Exception e) {
@@ -129,14 +117,10 @@ public class TextureCopy {
         }
     }
 
-    public static ArtifactAddress address(DumpLayout layout, Path file, boolean atlas) {
+    public static ArtifactAddress address(DumpLayout layout, Path file) {
         String[] parts = layout.relative(file).split("/", 3);
         String namespace = parts[1];
         String relative = parts[2];
-        if (atlas) {
-            String id = DumpFiles.stripExtension(relative.substring("atlases/".length()));
-            return new ArtifactAddress.Asset(namespace, id, ArtifactAddress.AssetKind.ATLAS);
-        }
         String id = relative.endsWith(".webp") ? DumpFiles.stripExtension(relative) + ".png" : relative;
         return new ArtifactAddress.Asset(namespace, namespace + ":" + id, ArtifactAddress.AssetKind.TEXTURE);
     }

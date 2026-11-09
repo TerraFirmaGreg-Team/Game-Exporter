@@ -14,12 +14,15 @@ import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.entity.ItemRenderer;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.client.resources.model.BakedModel;
+import net.minecraft.core.Direction;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.FoliageColor;
 import net.minecraft.world.level.GrassColor;
+import net.minecraftforge.client.model.data.ModelData;
 import org.joml.Matrix4f;
 import team.terrafirmagreg.exporter.assets.atlas.SpriteTint;
 import team.terrafirmagreg.exporter.assets.atlas.capture.AtlasSprite;
@@ -28,6 +31,10 @@ import team.terrafirmagreg.exporter.engine.run.RunScope;
 import team.terrafirmagreg.exporter.modern.ItemStackIds;
 
 public final class ItemIcons extends IconGridBase<OffScreenRenderer> {
+
+    private static final Direction[] FACES_AND_NULL = {
+        Direction.DOWN, Direction.UP, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST, null
+    };
 
     private final Minecraft client;
     private GuiGraphics graphics;
@@ -68,7 +75,7 @@ public final class ItemIcons extends IconGridBase<OffScreenRenderer> {
             return IconCell.failed();
         }
         Item item = stack.getItem();
-        int tint = blockItemTint(client, item, stack);
+        int tint = uniformIconTint(client, item, stack);
         SpriteTint meta;
         if (tint != -1) {
             renderUntinted(client, graphics, buffers, stack, x, y);
@@ -87,17 +94,45 @@ public final class ItemIcons extends IconGridBase<OffScreenRenderer> {
         return LayeredSlotIcons.fillEmpty(client, ids, sprites, cell);
     }
 
-    private static int blockItemTint(Minecraft client, Item item, ItemStack stack) {
+    private static int uniformIconTint(Minecraft client, Item item, ItemStack stack) {
         if (!(item instanceof BlockItem)) {
             return -1;
         }
-        for (int i = 0; i < 2; i++) {
-            int color = client.getItemColors().getColor(stack, i);
-            if (color != -1 && (color & 0xFFFFFF) != 0xFFFFFF) {
-                return color;
+        BakedModel model = client.getItemRenderer().getModel(stack, null, null, 0);
+        if (model == null) {
+            return -1;
+        }
+        BakedModel resolved = model.getOverrides().resolve(model, stack, null, null, 0);
+        if (resolved != null) {
+            model = resolved;
+        }
+        RandomSource random = RandomSource.create();
+        int tint = -1;
+        for (Direction dir : FACES_AND_NULL) {
+            List<BakedQuad> quads;
+            try {
+                random.setSeed(42L);
+                quads = model.getQuads(null, dir, random, ModelData.EMPTY, null);
+            } catch (RuntimeException e) {
+                return -1;
+            }
+            for (BakedQuad quad : quads) {
+                if (quad.getTintIndex() < 0) {
+                    return -1;
+                }
+                int color = client.getItemColors().getColor(stack, quad.getTintIndex());
+                if (color == -1 || (color & 0xFFFFFF) == 0xFFFFFF) {
+                    return -1;
+                }
+                color &= 0xFFFFFF;
+                if (tint == -1) {
+                    tint = color;
+                } else if (tint != color) {
+                    return -1;
+                }
             }
         }
-        return -1;
+        return tint;
     }
 
     private static String tintKind(int color) {

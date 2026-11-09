@@ -5,7 +5,7 @@ import java.util.Map;
 import team.terrafirmagreg.exporter.contract.id.EntryKind;
 import team.terrafirmagreg.exporter.contract.id.StackId;
 import team.terrafirmagreg.exporter.contract.text.DumpText;
-import team.terrafirmagreg.exporter.util.SnbtToJson;
+import team.terrafirmagreg.exporter.util.snbt.SnbtToJson;
 import tools.jackson.databind.JsonNode;
 
 public sealed interface StackEntry permits ItemStackEntry, FluidStackEntry {

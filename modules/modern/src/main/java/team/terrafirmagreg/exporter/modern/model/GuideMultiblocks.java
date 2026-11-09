@@ -44,6 +44,7 @@ import org.lwjgl.opengl.GL12;
 import team.terrafirmagreg.exporter.assets.atlas.ArgbImage;
 import team.terrafirmagreg.exporter.data.guide.GuideJsonNormalize;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
+import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
 import team.terrafirmagreg.exporter.dump.io.DumpHashes;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
 import team.terrafirmagreg.exporter.modern.texture.BlockAtlasCache;
@@ -58,7 +59,7 @@ import vazkii.patchouli.api.PatchouliAPI;
 public class GuideMultiblocks {
     private static final int VARIANT_SAMPLES = 16;
 
-    public record PendingGlb(Path file, GlbWriter.Mesh mesh) {}
+    public record PendingGlb(ArtifactAddress.Asset address, Path file, GlbWriter.Mesh mesh) {}
 
     public record Result(List<Map<String, Object>> defs, List<PendingGlb> pending) {}
 
@@ -90,7 +91,12 @@ public class GuideMultiblocks {
                 layout, atlasImage, sprites, sprite -> EntityPreviews.loadTexture(client, sprite));
         for (PendingGlb pending : pendingGlbs) {
             if (!Files.isRegularFile(pending.file()) || pending.mesh().layoutChanged(atlases)) {
-                scope.tasks().submit(() -> GlbWriter.write(pending.file(), pending.mesh(), atlases));
+                scope.tasks().submit(() -> {
+                    byte[] bytes = GlbWriter.encode(pending.file(), pending.mesh(), atlases);
+                    if (bytes != null) {
+                        layout.write(pending.address(), bytes);
+                    }
+                });
             }
         }
         return atlases;
@@ -201,7 +207,13 @@ public class GuideMultiblocks {
             if (mesh.isEmpty()) {
                 ExportLog.warn("{} empty mesh", id);
             } else {
-                pendingGlbs.add(new PendingGlb(out, mesh));
+                pendingGlbs.add(new PendingGlb(
+                        new ArtifactAddress.Asset(
+                                rl.getNamespace(),
+                                rl.getNamespace() + ":multiblock/" + rl.getPath() + ".glb",
+                                ArtifactAddress.AssetKind.MODEL),
+                        out,
+                        mesh));
             }
             glbByKey.put(id, rel);
             defs.add(def(id, mesh.isEmpty() ? null : rel, mesh.isEmpty() ? "empty" : null));
@@ -285,7 +297,11 @@ public class GuideMultiblocks {
         Path out = layout.inlineMultiblock(owner, sha);
         String rel = "assets/" + owner + "/multiblock/inline/" + sha + ".glb";
         if (!mesh.isEmpty()) {
-            pendingGlbs.add(new PendingGlb(out, mesh));
+            pendingGlbs.add(new PendingGlb(
+                    new ArtifactAddress.Asset(
+                            owner, owner + ":multiblock/inline/" + sha + ".glb", ArtifactAddress.AssetKind.MODEL),
+                    out,
+                    mesh));
         }
         glbByKey.put(sha, rel);
         defs.add(def("inline:" + sha, mesh.isEmpty() ? null : rel, mesh.isEmpty() ? "empty" : null));

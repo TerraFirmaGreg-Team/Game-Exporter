@@ -4,6 +4,8 @@ import java.nio.file.Path;
 import java.util.Set;
 import java.util.TreeSet;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen;
 import net.minecraft.network.chat.Component;
 import team.terrafirmagreg.exporter.assets.lang.LangComponent;
 import team.terrafirmagreg.exporter.assets.model.ModelComponent;
@@ -15,11 +17,11 @@ import team.terrafirmagreg.exporter.data.quest.QuestComponent;
 import team.terrafirmagreg.exporter.data.quest.QuestPaths;
 import team.terrafirmagreg.exporter.data.recipe.RecipeComponent;
 import team.terrafirmagreg.exporter.data.registry.RegistryComponent;
-import team.terrafirmagreg.exporter.data.registry.dump.RegistryCommit;
+import team.terrafirmagreg.exporter.data.registry.dump.RegistryLinkStep;
 import team.terrafirmagreg.exporter.data.tab.TabComponent;
 import team.terrafirmagreg.exporter.data.tag.TagComponent;
-import team.terrafirmagreg.exporter.engine.live.LiveExportWiringBase;
-import team.terrafirmagreg.exporter.engine.pipeline.ExportPipeline;
+import team.terrafirmagreg.exporter.engine.live.LiveExport;
+import team.terrafirmagreg.exporter.engine.run.ExportPipeline;
 import team.terrafirmagreg.exporter.modern.category.EmiRecipeCategorySource;
 import team.terrafirmagreg.exporter.modern.guide.PatchouliSource;
 import team.terrafirmagreg.exporter.modern.lang.LangIndex;
@@ -36,7 +38,8 @@ import team.terrafirmagreg.exporter.modern.tag.RegistryTagSource;
 import team.terrafirmagreg.exporter.modern.texture.ItemTextureSource;
 import team.terrafirmagreg.exporter.spi.PlatformCapabilities;
 
-public final class LiveDump extends LiveExportWiringBase<Minecraft> {
+public final class LiveDump extends LiveExport<Minecraft> {
+    private final EmiReadiness backend = new EmiReadiness();
 
     @Override
     protected Path gameDir() {
@@ -72,7 +75,7 @@ public final class LiveDump extends LiveExportWiringBase<Minecraft> {
         EmiRecipeSource recipes = new EmiRecipeSource();
         EmiStackSource stacks = new EmiStackSource();
         return new ExportPipeline("modern", "1.20.1")
-                .indexCommit(RegistryCommit::apply)
+                .epilogue(RegistryLinkStep::apply)
                 .add(new RegistryComponent(EntryKind.ITEM)
                         .addSource(new BuiltInRegistrySource(EntryKind.ITEM))
                         .addStackSource(stacks))
@@ -96,5 +99,55 @@ public final class LiveDump extends LiveExportWiringBase<Minecraft> {
                 .add(new ModelComponent()
                         .addSource(new GuideModelSource(client))
                         .addSource(new EntityModelSource(client)));
+    }
+
+    @Override
+    protected boolean inWorld(Minecraft client) {
+        return client.player != null && client.level != null;
+    }
+
+    @Override
+    protected boolean idleMenuReady(Minecraft client) {
+        if (client.level != null || client.player != null) {
+            return false;
+        }
+        return client.screen instanceof TitleScreen
+                || client.screen instanceof SelectWorldScreen
+                || client.screen == null;
+    }
+
+    @Override
+    protected boolean levelExists(Minecraft client, String saveName) {
+        return client.getLevelSource().levelExists(saveName);
+    }
+
+    @Override
+    protected void openWorld(Minecraft client, String saveName) {
+        client.createWorldOpenFlows().loadLevel(client.screen, saveName);
+    }
+
+    @Override
+    protected void createWorld(Minecraft client, String saveName) {
+        ExportWorldCreator.createWorld(client, saveName);
+    }
+
+    @Override
+    protected void stopClient(Minecraft client) {
+        client.stop();
+    }
+
+    @Override
+    protected BackendState backendState() {
+        return backend.state();
+    }
+
+    @Override
+    protected String backendStatusLabel() {
+        return backend.label();
+    }
+
+    @Override
+    protected void resetBackendWait() {
+        backend.reset();
     }
 }

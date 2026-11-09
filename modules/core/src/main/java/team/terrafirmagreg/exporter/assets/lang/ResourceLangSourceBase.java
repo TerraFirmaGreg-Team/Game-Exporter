@@ -8,7 +8,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import team.terrafirmagreg.exporter.dump.io.DumpWriter;
+import team.terrafirmagreg.exporter.dump.io.DumpJson;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
 import team.terrafirmagreg.exporter.engine.run.RunTasks;
 import team.terrafirmagreg.exporter.util.ExportLog;
@@ -127,7 +127,7 @@ public abstract class ResourceLangSourceBase implements LangSource {
     }
 
     protected void mergeLangLayer(Map<String, Object> into, String path, BufferedReader reader) throws IOException {
-        JsonNode el = DumpWriter.readGameTree(reader);
+        JsonNode el = DumpJson.readGameTree(reader);
         if (el != null && el.isObject()) {
             LangMerge.mergeJsonObject(into, (ObjectNode) el);
         }

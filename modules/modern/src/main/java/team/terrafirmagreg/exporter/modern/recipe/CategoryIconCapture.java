@@ -11,6 +11,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.resources.ResourceLocation;
 import team.terrafirmagreg.exporter.assets.atlas.ArgbImage;
+import team.terrafirmagreg.exporter.assets.texture.TextureCopy;
 import team.terrafirmagreg.exporter.contract.id.ResourceId;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
 import team.terrafirmagreg.exporter.dump.io.DumpImage;
@@ -81,7 +82,10 @@ final class CategoryIconCapture {
                     continue;
                 }
                 Path file = layout.texture(parsed.namespace(), "recipe_category/icon/" + parsed.path() + ".webp");
-                scope.tasks().submit(() -> DumpImage.write(file, ArgbImage.fromArgb(argb, ICON_PX, ICON_PX)));
+                scope.tasks()
+                        .submit(() -> layout.write(
+                                TextureCopy.address(layout, file),
+                                DumpImage.encode(ArgbImage.fromArgb(argb, ICON_PX, ICON_PX))));
                 categoryIcons.put(id, parsed.namespace() + ":textures/recipe_category/icon/" + parsed.path() + ".png");
             } catch (Throwable t) {
                 warnCap.warn("category icon {} capture failed: {}", id, t.toString());

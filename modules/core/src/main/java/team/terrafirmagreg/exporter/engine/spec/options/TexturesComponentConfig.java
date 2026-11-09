@@ -1,14 +1,14 @@
 package team.terrafirmagreg.exporter.engine.spec.options;
 
 import java.util.List;
-import team.terrafirmagreg.exporter.engine.spec.ComponentId;
+import team.terrafirmagreg.exporter.engine.spec.ComponentKey;
 
 public record TexturesComponentConfig(
         boolean enabled,
         List<String> includeMods,
         List<String> excludeMods,
         ComponentScope scope,
-        List<ComponentId> fromComponents,
+        List<ComponentKey> fromComponents,
         List<String> additionalMods,
         List<String> include,
         boolean gui,
@@ -19,7 +19,7 @@ public record TexturesComponentConfig(
     public static final int DEFAULT_ICON_SIZE = 32;
     public static final int DEFAULT_ATLAS_MAX_PAGE_SIZE = 2048;
     public static final List<String> DEFAULT_FROM = List.of("data.guide", "data.items", "data.quests", "data.recipes");
-    public static final List<ComponentId> DEFAULT_FROM_IDS = ProfileNormalize.parseComponentIds(DEFAULT_FROM);
+    public static final List<ComponentKey> DEFAULT_FROM_IDS = ProfileNormalize.parseComponentKeys(DEFAULT_FROM);
 
     public TexturesComponentConfig {
         includeMods = ProfileNormalize.normalizeList(includeMods);

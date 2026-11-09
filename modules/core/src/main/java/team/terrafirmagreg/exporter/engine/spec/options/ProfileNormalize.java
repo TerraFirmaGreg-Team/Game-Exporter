@@ -4,7 +4,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import lombok.experimental.UtilityClass;
-import team.terrafirmagreg.exporter.engine.spec.ComponentId;
+import team.terrafirmagreg.exporter.engine.spec.ComponentCatalog;
+import team.terrafirmagreg.exporter.engine.spec.ComponentKey;
 
 @UtilityClass
 public class ProfileNormalize {
@@ -39,13 +40,13 @@ public class ProfileNormalize {
         return Collections.unmodifiableList(out);
     }
 
-    public static List<ComponentId> parseComponentIds(List<String> raw) {
+    public static List<ComponentKey> parseComponentKeys(List<String> raw) {
         if (raw == null || raw.isEmpty()) {
             return List.of();
         }
-        List<ComponentId> out = new ArrayList<>();
+        List<ComponentKey> out = new ArrayList<>();
         for (String s : raw) {
-            out.add(ComponentId.parse(s));
+            out.add(ComponentCatalog.standard().parse(s));
         }
         return List.copyOf(out);
     }

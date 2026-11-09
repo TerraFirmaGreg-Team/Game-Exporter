@@ -1,19 +1,19 @@
 package team.terrafirmagreg.exporter.engine.spec.options;
 
 import java.util.List;
-import team.terrafirmagreg.exporter.engine.spec.ComponentId;
+import team.terrafirmagreg.exporter.engine.spec.ComponentKey;
 
 public record ModelsComponentConfig(
         boolean enabled,
         List<String> includeMods,
         List<String> excludeMods,
         ComponentScope scope,
-        List<ComponentId> fromComponents,
+        List<ComponentKey> fromComponents,
         List<String> additionalMods)
         implements ComponentOptions {
 
     public static final List<String> DEFAULT_FROM = List.of("data.guide", "data.quests");
-    public static final List<ComponentId> DEFAULT_FROM_IDS = ProfileNormalize.parseComponentIds(DEFAULT_FROM);
+    public static final List<ComponentKey> DEFAULT_FROM_IDS = ProfileNormalize.parseComponentKeys(DEFAULT_FROM);
 
     public ModelsComponentConfig {
         includeMods = ProfileNormalize.normalizeList(includeMods);

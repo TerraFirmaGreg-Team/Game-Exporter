@@ -22,8 +22,9 @@ import team.terrafirmagreg.exporter.contract.dto.storage.VersionsIndex;
 import team.terrafirmagreg.exporter.dump.DumpFiles;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
 import team.terrafirmagreg.exporter.dump.io.DumpHashes;
-import team.terrafirmagreg.exporter.dump.io.DumpWriter;
+import team.terrafirmagreg.exporter.dump.io.DumpJson;
 import team.terrafirmagreg.exporter.util.ExportLog;
+import team.terrafirmagreg.exporter.util.VersionOrder;
 
 @UtilityClass
 public class StorageSync {
@@ -102,7 +103,7 @@ public class StorageSync {
             joinAll(futures);
         }
         Map<String, String> indexView = new TreeMap<>(index);
-        byte[] indexBytes = DumpWriter.toJsonBytes(new ObjectsIndex(indexView));
+        byte[] indexBytes = DumpJson.toCanonicalJsonBytes(new ObjectsIndex(indexView));
         target.put(segmentPrefix + OBJECTS_INDEX + ".gz", gzip(indexBytes), "application/json", CACHE_RESOLVER);
         writeVersionsIndex(target, job);
         int deleted = deleteOrphans(target, job, plan, segmentPrefix, options.delete());
@@ -165,16 +166,25 @@ public class StorageSync {
     private static void writeVersionsIndex(StorageTarget target, StorageJob job) throws IOException {
         String key = job.packPrefix() + VERSIONS;
         VersionsIndex current = readVersionsIndex(target, key);
-        TreeSet<String> versions = new TreeSet<>(current.versions());
+        TreeSet<String> versions = new TreeSet<>(VersionOrder::compare);
+        versions.addAll(current.versions());
         if (!"latest".equals(job.segment())) {
             versions.add(job.segment());
         }
-        String latest = job.options().updateLatest() && !"latest".equals(job.segment())
-                ? job.segment()
-                : current.latest() != null ? current.latest() : job.segment();
+        String latest;
+        if (job.options().updateLatest() && !"latest".equals(job.segment())) {
+            TreeSet<String> candidates = new TreeSet<>(VersionOrder::compare);
+            candidates.addAll(versions);
+            if (current.latest() != null) {
+                candidates.add(current.latest());
+            }
+            latest = candidates.isEmpty() ? job.segment() : candidates.last();
+        } else {
+            latest = current.latest() != null ? current.latest() : job.segment();
+        }
         target.put(
                 key,
-                DumpWriter.toJsonBytes(new VersionsIndex(job.packId(), latest, List.copyOf(versions))),
+                DumpJson.toCanonicalJsonBytes(new VersionsIndex(job.packId(), latest, List.copyOf(versions))),
                 "application/json",
                 CACHE_RESOLVER);
     }
@@ -183,7 +193,7 @@ public class StorageSync {
         try {
             byte[] raw = target.get(key);
             if (raw != null) {
-                return DumpWriter.mapper().readValue(raw, VersionsIndex.class);
+                return DumpJson.mapper().readValue(raw, VersionsIndex.class);
             }
         } catch (Exception ignored) {
         }

@@ -1,8 +1,9 @@
 package team.terrafirmagreg.exporter.config.pack;
 
-import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.List;
-import team.terrafirmagreg.exporter.engine.spec.ComponentId;
+import team.terrafirmagreg.exporter.engine.spec.ComponentKey;
+import team.terrafirmagreg.exporter.engine.spec.ComponentKeys;
 import team.terrafirmagreg.exporter.engine.spec.options.ComponentOptions;
 import team.terrafirmagreg.exporter.engine.spec.options.ModIdFilter;
 import team.terrafirmagreg.exporter.engine.spec.options.ProductOptions;
@@ -44,17 +45,17 @@ public final class Data {
     }
 
     public ProductOptions toOptions() {
-        EnumMap<ComponentId, ComponentOptions> map = new EnumMap<>(ComponentId.class);
-        map.put(ComponentId.DATA_ITEMS, items.toOptions());
-        map.put(ComponentId.DATA_BLOCKS, blocks.toOptions());
-        map.put(ComponentId.DATA_FLUIDS, fluids.toOptions());
-        map.put(ComponentId.DATA_ENTITIES, entities.toOptions());
-        map.put(ComponentId.DATA_GUIDE, guide.toOptions());
-        map.put(ComponentId.DATA_RECIPES, recipes.toOptions());
-        map.put(ComponentId.DATA_RECIPE_CATEGORIES, recipeCategories.toOptions());
-        map.put(ComponentId.DATA_TABS, tabs.toOptions());
-        map.put(ComponentId.DATA_TAGS, tags.toOptions());
-        map.put(ComponentId.DATA_QUESTS, quests.toOptions());
+        LinkedHashMap<ComponentKey, ComponentOptions> map = new LinkedHashMap<>();
+        map.put(ComponentKeys.DATA_ITEMS, items.toOptions());
+        map.put(ComponentKeys.DATA_BLOCKS, blocks.toOptions());
+        map.put(ComponentKeys.DATA_FLUIDS, fluids.toOptions());
+        map.put(ComponentKeys.DATA_ENTITIES, entities.toOptions());
+        map.put(ComponentKeys.DATA_GUIDE, guide.toOptions());
+        map.put(ComponentKeys.DATA_RECIPES, recipes.toOptions());
+        map.put(ComponentKeys.DATA_RECIPE_CATEGORIES, recipeCategories.toOptions());
+        map.put(ComponentKeys.DATA_TABS, tabs.toOptions());
+        map.put(ComponentKeys.DATA_TAGS, tags.toOptions());
+        map.put(ComponentKeys.DATA_QUESTS, quests.toOptions());
         return new ProductOptions(modFilter(), map);
     }
 }

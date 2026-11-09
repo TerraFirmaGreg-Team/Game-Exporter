@@ -1,17 +1,55 @@
 package team.terrafirmagreg.exporter.dump;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import team.terrafirmagreg.exporter.contract.id.EntryKind;
+import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
+import team.terrafirmagreg.exporter.dump.io.ArtifactAddressRenderer;
+import team.terrafirmagreg.exporter.dump.io.DumpWriter;
+import team.terrafirmagreg.exporter.dump.transaction.ArtifactWriter;
 
-public record DumpLayout(Path root) {
+public record DumpLayout(Path root, DumpWriter writer, ArtifactWriter artifacts) {
     public static final String MANIFEST = "manifest.json";
     public static final String META = "meta";
     public static final String SCHEMA_DUMP = "manifest";
     public static final String LAYOUT = "v2";
     public static final String OBJECTS = "objects";
 
+    public DumpLayout {
+        root = root.toAbsolutePath().normalize();
+    }
+
     public DumpLayout(Path root) {
-        this.root = root.toAbsolutePath().normalize();
+        this(root, DumpWriter.COMPACT, null);
+    }
+
+    public DumpLayout(Path root, boolean prettyJson) {
+        this(root, prettyJson ? DumpWriter.PRETTY : DumpWriter.COMPACT, null);
+    }
+
+    public DumpLayout(Path root, DumpWriter writer) {
+        this(root, writer, null);
+    }
+
+    public void write(ArtifactAddress address, byte[] content) throws IOException {
+        if (artifacts != null) {
+            artifacts.write(address, content, address.mediaType());
+            return;
+        }
+        DumpFiles.write(new ArtifactAddressRenderer(root).render(address), content);
+    }
+
+    public void writeJson(ArtifactAddress address, Object value) throws IOException {
+        write(address, writer.toJsonBytes(value));
+    }
+
+    public void discard(ArtifactAddress address) throws IOException {
+        if (artifacts != null) {
+            artifacts.discard(address);
+            return;
+        }
+        Files.deleteIfExists(new ArtifactAddressRenderer(root).render(address));
     }
 
     public Path manifest() {
@@ -60,14 +98,6 @@ public record DumpLayout(Path root) {
 
     public Path assets(String modId) {
         return AssetPaths.assets(this, modId);
-    }
-
-    public Path atlases(String modId) {
-        return assets(modId).resolve(AssetPaths.ATLASES);
-    }
-
-    public Path atlasJson(String modId, EntryKind kind) {
-        return AssetPaths.atlasFile(this, modId, kind);
     }
 
     public Path atlasItemPage(String modId, int page) {

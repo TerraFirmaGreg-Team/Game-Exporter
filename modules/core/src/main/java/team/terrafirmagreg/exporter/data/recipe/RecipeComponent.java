@@ -7,25 +7,24 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import team.terrafirmagreg.exporter.contract.artifact.ArtifactAddress;
 import team.terrafirmagreg.exporter.contract.dto.recipe.RecipeCategoryLayout;
 import team.terrafirmagreg.exporter.contract.dto.recipe.RecipeEntry;
 import team.terrafirmagreg.exporter.contract.id.ResourceId;
 import team.terrafirmagreg.exporter.data.recipe.dump.RecipeDump;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
+import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
 import team.terrafirmagreg.exporter.engine.demand.ResourceDemand;
-import team.terrafirmagreg.exporter.engine.output.ComponentOutcome;
-import team.terrafirmagreg.exporter.engine.output.ComponentOutcomeBuilder;
-import team.terrafirmagreg.exporter.engine.output.LinkPayload;
-import team.terrafirmagreg.exporter.engine.pipeline.ExportTask;
-import team.terrafirmagreg.exporter.engine.pipeline.NodeContribution;
-import team.terrafirmagreg.exporter.engine.pipeline.NodeContributionContext;
-import team.terrafirmagreg.exporter.engine.pipeline.NodeContributor;
-import team.terrafirmagreg.exporter.engine.plan.Affinity;
-import team.terrafirmagreg.exporter.engine.plan.ComponentDefinition;
-import team.terrafirmagreg.exporter.engine.plan.ExecutionContext;
+import team.terrafirmagreg.exporter.engine.graph.ExportComponent;
+import team.terrafirmagreg.exporter.engine.graph.NodeContext;
+import team.terrafirmagreg.exporter.engine.graph.OutputKey;
+import team.terrafirmagreg.exporter.engine.graph.PlanNode;
+import team.terrafirmagreg.exporter.engine.report.ComponentResult;
+import team.terrafirmagreg.exporter.engine.report.ComponentResultBuilder;
+import team.terrafirmagreg.exporter.engine.run.ExecutionContext;
+import team.terrafirmagreg.exporter.engine.run.Lane;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
-import team.terrafirmagreg.exporter.engine.spec.ComponentId;
+import team.terrafirmagreg.exporter.engine.spec.ComponentKey;
+import team.terrafirmagreg.exporter.engine.spec.ComponentKeys;
 import team.terrafirmagreg.exporter.engine.spec.ExportSpec;
 import team.terrafirmagreg.exporter.engine.spec.options.ModIdFilter;
 import team.terrafirmagreg.exporter.engine.spec.options.RecipesComponentConfig;
@@ -33,9 +32,8 @@ import team.terrafirmagreg.exporter.spi.MergePolicy;
 import team.terrafirmagreg.exporter.spi.SourceSet;
 import team.terrafirmagreg.exporter.util.ExportLog;
 
-public final class RecipeComponent implements ExportTask, NodeContributor {
+public final class RecipeComponent implements ExportComponent {
     static final int WRITE_BATCH = 1024;
-    private static final int NODE_BASE = ComponentId.executionOrder().indexOf(ComponentId.DATA_RECIPES) * 10;
     private final SourceSet<RecipeSource> sources = new SourceSet<>("recipes", MergePolicy.ORDERED_OVERLAY);
 
     static StreamingCardSink cardSink(RunScope scope, DumpLayout layout) {
@@ -58,8 +56,8 @@ public final class RecipeComponent implements ExportTask, NodeContributor {
     }
 
     @Override
-    public ComponentId id() {
-        return ComponentId.DATA_RECIPES;
+    public ComponentKey id() {
+        return ComponentKeys.DATA_RECIPES;
     }
 
     @Override
@@ -68,23 +66,28 @@ public final class RecipeComponent implements ExportTask, NodeContributor {
     }
 
     @Override
-    public NodeContribution contributeNodes(NodeContributionContext context) {
+    public List<PlanNode> nodes(NodeContext context) {
         if (sources.isEmpty()) {
-            return NodeContribution.none();
+            return List.of();
         }
-        return new NodeContribution(List.of(captureNode(context)), Set.of(RecipeStageKeys.CAPTURED));
+        return List.of(captureNode(context));
     }
 
     @Override
-    public ComponentOutcome execute(ExportSpec request, DumpLayout layout, ExecutionContext context)
-            throws IOException {
+    public Set<OutputKey<?>> inputs(NodeContext context) {
+        return sources.isEmpty() ? Set.of() : Set.of(RecipeStageKeys.CAPTURED);
+    }
+
+    @Override
+    public ComponentResult execute(ExportSpec request, DumpLayout layout, ExecutionContext context) throws IOException {
         RunScope scope = context.scope();
         RecipesComponentConfig options = request.data().recipes();
         ModIdFilter filter = request.filterFor(id());
-        RecipeSnapshot captured = context.find(RecipeStageKeys.CAPTURED).orElse(null);
-        if (captured == null) {
-            captured = captureAll(layout, scope, options, filter);
-        }
+        RecipeSnapshot captured = sources.isEmpty()
+                ? RecipeSnapshot.empty()
+                : context.find(RecipeStageKeys.CAPTURED)
+                        .orElseThrow(() -> new IllegalStateException(
+                                "recipe capture node did not publish " + RecipeStageKeys.CAPTURED.name()));
         Map<String, RecipeEntry> recipes = new Object2ObjectLinkedOpenHashMap<>(captured.recipes());
         if (!filter.allowsAll()) {
             Map<String, RecipeEntry> scoped = new Object2ObjectLinkedOpenHashMap<>(recipes.size());
@@ -100,7 +103,7 @@ public final class RecipeComponent implements ExportTask, NodeContributor {
         ExportLog.Progress writes = ExportLog.progress("data.recipes.write", recipes.size());
         int invalidIds = 0;
         int missingCategory = 0;
-        ComponentOutcomeBuilder result = ComponentOutcome.builder(id());
+        ComponentResultBuilder result = ComponentResult.builder(id());
         for (String diagnostic : sources.diagnostics()) {
             result.diagnostic(diagnostic);
         }
@@ -126,9 +129,6 @@ public final class RecipeComponent implements ExportTask, NodeContributor {
                         .computeIfAbsent(categoryPath, ignored -> new Object2ObjectLinkedOpenHashMap<>())
                         .put(canonicalId, body);
             }
-            if (body.image() != null && !body.image().isBlank()) {
-                result.artifact(recipeImageArtifact(parsedId.namespace(), body.image()));
-            }
             writes.step();
         }
         int submitted = 0;
@@ -136,8 +136,6 @@ public final class RecipeComponent implements ExportTask, NodeContributor {
             for (Map.Entry<String, Map<String, RecipeEntry>> bucket :
                     ns.getValue().entrySet()) {
                 scope.tasks().submit(() -> RecipeDump.write(layout, ns.getKey(), bucket.getKey(), bucket.getValue()));
-                result.artifact(
-                        new ArtifactAddress.Data(ns.getKey(), bucket.getKey(), ArtifactAddress.DataKind.RECIPE));
                 submitted++;
                 if (submitted % WRITE_BATCH == 0) {
                     scope.tasks().reapCompleted();
@@ -153,8 +151,8 @@ public final class RecipeComponent implements ExportTask, NodeContributor {
                 scope.tasks().pendingCount());
         result.ownedModIds(RecipeSnapshot.ownedModIdsOf(written))
                 .resourceDemand(RecipeSnapshot.demandOf(written))
-                .count("recipes", written.size())
-                .payload(LinkPayload.builder().recipes(written).build());
+                .count("recipes", written.size());
+        context.contribute(RecipeChannels.BY_ID, written);
         if (invalidIds > 0) {
             result.diagnostic("Skipped " + invalidIds + " recipes with invalid ids");
         }
@@ -164,8 +162,8 @@ public final class RecipeComponent implements ExportTask, NodeContributor {
         return result.build();
     }
 
-    private ComponentDefinition captureNode(NodeContributionContext context) {
-        return ComponentDefinition.builder(RecipeStageKeys.CAPTURE_NODE, ctx -> {
+    private PlanNode captureNode(NodeContext context) {
+        return PlanNode.builder(RecipeStageKeys.CAPTURE_NODE, ctx -> {
                     RecipeSnapshot captured = captureAll(
                             context.layout(),
                             ctx.scope(),
@@ -173,8 +171,7 @@ public final class RecipeComponent implements ExportTask, NodeContributor {
                             context.request().filterFor(id()));
                     ctx.publish(RecipeStageKeys.CAPTURED, captured);
                 })
-                .affinity(Affinity.RENDER)
-                .order(NODE_BASE + 1)
+                .lane(Lane.RENDER)
                 .output(RecipeStageKeys.CAPTURED)
                 .build();
     }

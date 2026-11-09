@@ -13,7 +13,8 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import team.terrafirmagreg.exporter.assets.lang.LangMerge;
-import team.terrafirmagreg.exporter.dump.io.DumpWriter;
+import team.terrafirmagreg.exporter.dump.io.DumpJson;
+import team.terrafirmagreg.exporter.util.snbt.SnbtFiles;
 import tools.jackson.databind.JsonNode;
 
 class IoTest {
@@ -22,25 +23,25 @@ class IoTest {
 
     @Test
     void readsGameJsonPastBom() throws Exception {
-        JsonNode tree = DumpWriter.readGameTree(new StringReader(BOM + "{\"a\":1}"));
+        JsonNode tree = DumpJson.readGameTree(new StringReader(BOM + "{\"a\":1}"));
         assertEquals(1, tree.get("a").intValue());
     }
 
     @Test
     void skipsRepeatedBom() throws Exception {
-        JsonNode tree = DumpWriter.readGameTree(new StringReader(BOM + BOM + "{\"a\":1}"));
+        JsonNode tree = DumpJson.readGameTree(new StringReader(BOM + BOM + "{\"a\":1}"));
         assertEquals(1, tree.get("a").intValue());
     }
 
     @Test
     void leavesCleanReaderUntouched() throws Exception {
-        JsonNode tree = DumpWriter.readGameTree(new StringReader("{\"a\":1}"));
+        JsonNode tree = DumpJson.readGameTree(new StringReader("{\"a\":1}"));
         assertEquals(1, tree.get("a").intValue());
     }
 
     @Test
     void stripsBomFromStringJson() throws Exception {
-        JsonNode tree = DumpWriter.readTree(BOM + "{\"a\":1}");
+        JsonNode tree = DumpJson.readTree(BOM + "{\"a\":1}");
         assertEquals(1, tree.get("a").intValue());
     }
 

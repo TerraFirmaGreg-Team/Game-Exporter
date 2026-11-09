@@ -3,8 +3,8 @@ package team.terrafirmagreg.exporter.engine.spec;
 import java.util.*;
 import lombok.experimental.UtilityClass;
 import team.terrafirmagreg.exporter.engine.demand.ResourceDemand;
-import team.terrafirmagreg.exporter.engine.output.VerticalOutputs;
-import team.terrafirmagreg.exporter.engine.plan.ExecutionContext;
+import team.terrafirmagreg.exporter.engine.report.ComponentOutputs;
+import team.terrafirmagreg.exporter.engine.run.ExecutionContext;
 import team.terrafirmagreg.exporter.engine.spec.options.ComponentScope;
 import team.terrafirmagreg.exporter.engine.spec.options.ModIdFilter;
 
@@ -13,7 +13,7 @@ public class EffectiveMods {
 
     public static Set<String> resolve(
             ComponentScope scope,
-            List<ComponentId> fromComponents,
+            List<ComponentKey> fromComponents,
             ExecutionContext context,
             Collection<String> additionalMods,
             Collection<String> discoveredModIds,
@@ -67,24 +67,24 @@ public class EffectiveMods {
         return Set.copyOf(out);
     }
 
-    private static Set<String> ownedModIds(List<ComponentId> componentIds, ExecutionContext context) {
+    private static Set<String> ownedModIds(List<ComponentKey> componentIds, ExecutionContext context) {
         if (componentIds == null) {
             return Set.of();
         }
         Set<String> owned = new LinkedHashSet<>();
-        for (ComponentId id : componentIds) {
-            owned.addAll(VerticalOutputs.require(context, id).data().ownedModIds());
+        for (ComponentKey id : componentIds) {
+            owned.addAll(ComponentOutputs.require(context, id).ownedModIds());
         }
         return Set.copyOf(owned);
     }
 
-    public static ResourceDemand demandFrom(List<ComponentId> fromComponents, ExecutionContext context) {
+    public static ResourceDemand demandFrom(List<ComponentKey> fromComponents, ExecutionContext context) {
         if (fromComponents == null) {
             return ResourceDemand.empty();
         }
         ResourceDemand.Builder b = ResourceDemand.builder();
-        for (ComponentId id : fromComponents) {
-            b.merge(VerticalOutputs.require(context, id).data().demand());
+        for (ComponentKey id : fromComponents) {
+            b.merge(ComponentOutputs.require(context, id).resourceDemand());
         }
         return b.build();
     }

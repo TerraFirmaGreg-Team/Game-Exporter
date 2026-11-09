@@ -1,7 +1,7 @@
 package team.terrafirmagreg.exporter.data.recipe;
 
 import lombok.experimental.UtilityClass;
-import team.terrafirmagreg.exporter.engine.plan.OutputKey;
+import team.terrafirmagreg.exporter.engine.graph.OutputKey;
 
 @UtilityClass
 public class RecipeStageKeys {

@@ -17,15 +17,9 @@ import team.terrafirmagreg.exporter.assets.atlas.dump.ShelfAtlasPacker;
 import team.terrafirmagreg.exporter.assets.atlas.dump.ShelfAtlasPacker.ShelfPlacement;
 import team.terrafirmagreg.exporter.assets.atlas.dump.ShelfAtlasPacker.ShelfPlan;
 import team.terrafirmagreg.exporter.assets.atlas.dump.ShelfAtlasPacker.ShelfSprite;
-import team.terrafirmagreg.exporter.contract.dto.atlas.AtlasDocument;
-import team.terrafirmagreg.exporter.contract.dto.atlas.AtlasEntry;
-import team.terrafirmagreg.exporter.contract.dto.atlas.AtlasPage;
-import team.terrafirmagreg.exporter.contract.id.EntryKind;
-import team.terrafirmagreg.exporter.contract.ref.ReferenceKind;
-import team.terrafirmagreg.exporter.contract.ref.TaggedReference;
+import team.terrafirmagreg.exporter.assets.texture.TextureCopy;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
 import team.terrafirmagreg.exporter.dump.io.DumpImage;
-import team.terrafirmagreg.exporter.dump.io.DumpWriter;
 
 @UtilityClass
 public class BlockAtlasCache {
@@ -117,7 +111,7 @@ public class BlockAtlasCache {
             height = image.getHeight();
         }
         boolean layoutChanged = !Files.isRegularFile(png);
-        DumpImage.write(png, image);
+        layout.write(TextureCopy.address(layout, png), DumpImage.encode(image));
         Map<Sprite, ResultPlacement> placements = new LinkedHashMap<>();
         for (Sprite sprite : sprites) {
             placements.put(sprite, new ResultPlacement(0, 0, width, height));
@@ -171,17 +165,9 @@ public class BlockAtlasCache {
         }
         ShelfPlan plan = ShelfAtlasPacker.pack(sprites);
         Path png = layout.atlasBlockPage(modId, 0);
-        Path metadata = layout.atlasJson(modId, EntryKind.BLOCK);
         BufferedImage atlas = ShelfAtlasPacker.render(source, plan, sprites);
-        boolean layoutChanged = !Files.isRegularFile(metadata);
-        DumpImage.write(png, atlas);
-        AtlasDocument document = new AtlasDocument(
-                "assets/atlas",
-                modId,
-                EntryKind.BLOCK.id(),
-                List.of(new AtlasPage(DumpLayout.pageSrc(EntryKind.BLOCK, 0), plan.width(), plan.height())),
-                metadataSprites(sourceSprites, plan));
-        DumpWriter.writeJson(metadata, document);
+        boolean layoutChanged = !Files.isRegularFile(png);
+        layout.write(TextureCopy.address(layout, png), DumpImage.encode(atlas));
         return new Result(
                 "../../textures/atlas/blocks/page-0.webp",
                 png,
@@ -201,28 +187,6 @@ public class BlockAtlasCache {
             if (p != null) {
                 out.put(s, new ResultPlacement(p.x(), p.y(), p.width(), p.height()));
             }
-        }
-        return out;
-    }
-
-    private static List<AtlasEntry> metadataSprites(List<Sprite> sprites, ShelfPlan plan) {
-        List<AtlasEntry> out = new ArrayList<>();
-        for (Sprite sprite : sprites) {
-            ShelfPlacement p = plan.placements()
-                    .get(new ShelfSprite(sprite.id(), sprite.x(), sprite.y(), sprite.width(), sprite.height()));
-            if (p == null) {
-                continue;
-            }
-            out.add(new AtlasEntry(
-                    new TaggedReference(ReferenceKind.BLOCK, sprite.id()),
-                    0,
-                    p.x(),
-                    p.y(),
-                    p.width(),
-                    p.height(),
-                    null,
-                    null,
-                    null));
         }
         return out;
     }

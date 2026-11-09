@@ -8,6 +8,7 @@ import java.util.List;
 import lombok.experimental.UtilityClass;
 import team.terrafirmagreg.exporter.assets.atlas.capture.AtlasSection;
 import team.terrafirmagreg.exporter.assets.atlas.dump.AtlasSectionPacker.PackedSection;
+import team.terrafirmagreg.exporter.assets.texture.TextureCopy;
 import team.terrafirmagreg.exporter.contract.dto.atlas.AtlasDocument;
 import team.terrafirmagreg.exporter.contract.dto.atlas.AtlasEntry;
 import team.terrafirmagreg.exporter.contract.dto.atlas.AtlasSpriteRow;
@@ -29,7 +30,7 @@ class AtlasSheetWrite {
         List<Path> files = new ObjectArrayList<>();
         for (int i = 0; i < sheets.size(); i++) {
             Path webp = AssetPaths.atlasPage(layout, modId, section, i);
-            DumpImage.write(webp, sheets.get(i));
+            layout.write(TextureCopy.address(layout, webp), DumpImage.encode(sheets.get(i)));
             files.add(webp);
         }
         return files;

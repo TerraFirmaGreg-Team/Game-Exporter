@@ -11,8 +11,8 @@ public record ExportSpec(
         Path outputDir,
         Path gameDir,
         List<String> requestedSelectors,
-        List<ComponentId> requestedComponents,
-        List<ComponentId> resolvedComponents,
+        List<ComponentKey> requestedComponents,
+        List<ComponentKey> resolvedComponents,
         List<String> languages,
         ProductOptions assets,
         ProductOptions data,
@@ -28,9 +28,9 @@ public record ExportSpec(
         languages = List.copyOf(languages);
     }
 
-    private static List<ProductId> productsOf(List<ComponentId> components) {
+    private static List<ProductId> productsOf(List<ComponentKey> components) {
         Set<ProductId> products = new LinkedHashSet<>();
-        for (ComponentId id : components) {
+        for (ComponentKey id : components) {
             products.add(id.product());
         }
         return List.copyOf(products);
@@ -40,15 +40,15 @@ public record ExportSpec(
         return id == ProductId.ASSETS ? assets : data;
     }
 
-    public ComponentOptions component(ComponentId id) {
+    public ComponentOptions component(ComponentKey id) {
         return product(id.product()).component(id);
     }
 
-    public boolean includes(ComponentId id) {
+    public boolean includes(ComponentKey id) {
         return resolvedComponents.contains(id);
     }
 
-    public ModIdFilter filterFor(ComponentId id) {
+    public ModIdFilter filterFor(ComponentKey id) {
         return ModIdFilter.combine(product(id.product()).filter(), component(id).filter());
     }
 

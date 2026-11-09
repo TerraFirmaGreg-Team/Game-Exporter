@@ -3,7 +3,6 @@ package team.terrafirmagreg.exporter.data.guide;
 import java.util.*;
 import lombok.experimental.Accessors;
 import team.terrafirmagreg.exporter.engine.demand.ResourceDemand;
-import team.terrafirmagreg.exporter.engine.output.GuideJsonCache;
 
 @Accessors(fluent = true)
 public record GuideSnapshot(List<GuideBook> books, ResourceDemand demand, GuideJsonCache jsonCache) {

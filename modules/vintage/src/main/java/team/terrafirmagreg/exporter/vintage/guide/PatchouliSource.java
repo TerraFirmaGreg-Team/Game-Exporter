@@ -18,7 +18,7 @@ import net.minecraftforge.fml.common.Loader;
 import team.terrafirmagreg.exporter.data.guide.GuideBookPaths;
 import team.terrafirmagreg.exporter.data.guide.GuideBookSourceBase;
 import team.terrafirmagreg.exporter.util.ExportLog;
-import team.terrafirmagreg.exporter.vintage.pack.PackFiles;
+import team.terrafirmagreg.exporter.util.PackFiles;
 
 public final class PatchouliSource extends GuideBookSourceBase {
 

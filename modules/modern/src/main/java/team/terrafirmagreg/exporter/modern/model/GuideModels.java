@@ -9,13 +9,12 @@ import java.util.List;
 import java.util.Map;
 import lombok.experimental.UtilityClass;
 import net.minecraft.client.Minecraft;
-import team.terrafirmagreg.exporter.contract.id.EntryKind;
+import team.terrafirmagreg.exporter.data.guide.GuideJsonCache;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
-import team.terrafirmagreg.exporter.engine.output.GuideJsonCache;
+import team.terrafirmagreg.exporter.engine.report.RunMetrics;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
 import team.terrafirmagreg.exporter.modern.texture.BlockAtlasCache;
 import team.terrafirmagreg.exporter.util.ExportLog;
-import team.terrafirmagreg.exporter.util.RunMetrics;
 
 @UtilityClass
 public class GuideModels {
@@ -52,13 +51,6 @@ public class GuideModels {
         for (Map.Entry<String, BlockAtlasCache.Result> atlas : atlases.entrySet()) {
             if (Files.isRegularFile(atlas.getValue().png())) {
                 written.add(atlas.getValue().png());
-            }
-            if (atlas.getValue().standalone()) {
-                continue;
-            }
-            Path metadata = layout.atlasJson(atlas.getKey(), EntryKind.BLOCK);
-            if (Files.isRegularFile(metadata)) {
-                written.add(metadata);
             }
         }
         ExportLog.info(

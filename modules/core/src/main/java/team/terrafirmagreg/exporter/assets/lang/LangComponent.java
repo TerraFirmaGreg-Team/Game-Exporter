@@ -13,22 +13,24 @@ import team.terrafirmagreg.exporter.assets.lang.dump.LangDump.LangWrite;
 import team.terrafirmagreg.exporter.contract.text.DisplayFill;
 import team.terrafirmagreg.exporter.contract.text.LangAdditions;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
-import team.terrafirmagreg.exporter.engine.output.ComponentExtras;
-import team.terrafirmagreg.exporter.engine.output.ComponentOutcome;
-import team.terrafirmagreg.exporter.engine.output.LinkPayload;
-import team.terrafirmagreg.exporter.engine.output.VerticalOutputs;
-import team.terrafirmagreg.exporter.engine.pipeline.ExportTask;
-import team.terrafirmagreg.exporter.engine.plan.Affinity;
-import team.terrafirmagreg.exporter.engine.plan.ExecutionContext;
+import team.terrafirmagreg.exporter.engine.graph.ExportComponent;
+import team.terrafirmagreg.exporter.engine.graph.NodeContext;
+import team.terrafirmagreg.exporter.engine.graph.OutputKey;
+import team.terrafirmagreg.exporter.engine.report.ComponentOutputs;
+import team.terrafirmagreg.exporter.engine.report.ComponentResult;
+import team.terrafirmagreg.exporter.engine.run.ExecutionContext;
+import team.terrafirmagreg.exporter.engine.run.Lane;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
-import team.terrafirmagreg.exporter.engine.spec.ComponentId;
+import team.terrafirmagreg.exporter.engine.spec.ComponentCatalog;
+import team.terrafirmagreg.exporter.engine.spec.ComponentKey;
+import team.terrafirmagreg.exporter.engine.spec.ComponentKeys;
 import team.terrafirmagreg.exporter.engine.spec.ExportSpec;
 import team.terrafirmagreg.exporter.engine.spec.options.ModIdFilter;
 import team.terrafirmagreg.exporter.spi.MergePolicy;
 import team.terrafirmagreg.exporter.spi.ModIndexSource;
 import team.terrafirmagreg.exporter.spi.SourceSet;
 
-public final class LangComponent implements ExportTask {
+public final class LangComponent implements ExportComponent {
     private final SourceSet<LangSource> sources = new SourceSet<>("lang", MergePolicy.ORDERED_OVERLAY);
     private final SourceSet<ModIndexSource> modSources = new SourceSet<>("mod index", MergePolicy.ORDERED_OVERLAY);
 
@@ -43,8 +45,8 @@ public final class LangComponent implements ExportTask {
     }
 
     @Override
-    public ComponentId id() {
-        return ComponentId.ASSETS_LANG;
+    public ComponentKey id() {
+        return ComponentKeys.ASSETS_LANG;
     }
 
     @Override
@@ -53,54 +55,57 @@ public final class LangComponent implements ExportTask {
     }
 
     @Override
-    public Affinity affinity() {
-        return Affinity.IO;
+    public Lane lane() {
+        return Lane.IO;
     }
 
     @Override
-    public Set<ComponentId> dependencies(ExportSpec request, Set<ComponentId> selected) {
-        LinkedHashSet<ComponentId> deps = new LinkedHashSet<>();
-        for (ComponentId candidate : selected) {
+    public Set<OutputKey<?>> inputs(NodeContext context) {
+        LinkedHashSet<ComponentKey> deps = new LinkedHashSet<>();
+        for (ComponentKey candidate : context.selected()) {
             if (candidate.product() != id().product()) {
                 deps.add(candidate);
             }
         }
-        return Set.copyOf(deps);
+        return ComponentOutputs.selectedInputs(context.selected(), deps);
     }
 
     @Override
-    public ComponentOutcome execute(ExportSpec request, DumpLayout layout, ExecutionContext context)
-            throws IOException {
+    public ComponentResult execute(ExportSpec request, DumpLayout layout, ExecutionContext context) throws IOException {
         RunScope scope = context.scope();
         List<DisplayFill> modFills = new ArrayList<>();
         Map<String, String> modKeys = captureModKeys(modFills);
         ModIdFilter filter = request.filterFor(id());
         List<DisplayFill> fills = new ArrayList<>(modFills);
         LangAdditions additions = new LangAdditions();
-        Set<ComponentId> selected = new LinkedHashSet<>(request.resolvedComponents());
-        for (ComponentId dep : ComponentId.values()) {
+        Set<ComponentKey> selected = new LinkedHashSet<>(request.resolvedComponents());
+        Map<ComponentKey, List<DisplayFill>> fillsByDep =
+                context.findMerged(LangChannels.DISPLAY_FILLS).orElse(Map.of());
+        Map<ComponentKey, LangAdditions> additionsByDep =
+                context.findMerged(LangChannels.ADDITIONS).orElse(Map.of());
+        for (ComponentKey dep : ComponentCatalog.standard().all()) {
             if (dep.product() == id().product() || !selected.contains(dep)) {
                 continue;
             }
-            ComponentExtras extras =
-                    VerticalOutputs.require(context, dep).data().extras();
-            fills.addAll(extras.displayFills());
-            additions.merge(extras.langAdditions());
+            fills.addAll(fillsByDep.getOrDefault(dep, List.of()));
+            LangAdditions depAdditions = additionsByDep.get(dep);
+            if (depAdditions != null) {
+                additions.merge(depAdditions);
+            }
         }
         LangWrite written = LangDump.writeAssetLang(
                 request.gameDir(), layout, request.languages(), sources.available(), filter, fills, additions, scope);
-        return ComponentOutcome.builder(id())
+        context.contribute(LangChannels.LANGS, written.langs());
+        context.contribute(LangChannels.NAMESPACE_LANGUAGES, written.namespaceLanguages());
+        context.contribute(LangChannels.KEYBIND_NAMESPACES, written.keybindNamespaces());
+        context.contribute(LangChannels.MOD_KEYS, modKeys);
+        if (!modFills.isEmpty()) {
+            context.contribute(LangChannels.DISPLAY_FILLS, Map.of(id(), List.copyOf(modFills)));
+        }
+        return ComponentResult.builder(id())
                 .ownedModIds(written.ownedModIds())
-                .artifacts(written.artifacts())
-                .displayFills(modFills)
-                .modDisplayKeys(modKeys)
                 .count("keys", written.keys())
                 .count("mods", written.ownedModIds().size())
-                .payload(LinkPayload.builder()
-                        .langs(written.langs())
-                        .namespaceLanguages(written.namespaceLanguages())
-                        .keybindNamespaces(written.keybindNamespaces())
-                        .build())
                 .build();
     }
 

@@ -8,7 +8,7 @@ import team.terrafirmagreg.exporter.contract.dto.recipe.RecipeEntry;
 import team.terrafirmagreg.exporter.contract.id.ResourceId;
 import team.terrafirmagreg.exporter.dump.DataPaths;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
-import team.terrafirmagreg.exporter.dump.io.DumpWriter;
+import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
 
 @UtilityClass
 public class RecipeDump {
@@ -31,6 +31,8 @@ public class RecipeDump {
 
     public static void write(DumpLayout layout, String namespace, String categoryPath, Map<String, RecipeEntry> recipes)
             throws IOException {
-        DumpWriter.writeJson(file(layout, namespace, categoryPath), recipes == null ? Map.of() : recipes);
+        layout.writeJson(
+                new ArtifactAddress.Data(namespace, categoryPath, ArtifactAddress.DataKind.RECIPE),
+                recipes == null ? Map.of() : recipes);
     }
 }

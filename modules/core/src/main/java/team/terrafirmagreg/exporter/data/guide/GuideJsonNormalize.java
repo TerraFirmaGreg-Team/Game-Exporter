@@ -3,6 +3,7 @@ package team.terrafirmagreg.exporter.data.guide;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import lombok.experimental.UtilityClass;
+import team.terrafirmagreg.exporter.dump.io.DumpJson;
 import team.terrafirmagreg.exporter.dump.io.DumpWriter;
 import team.terrafirmagreg.exporter.util.JsonNodes;
 import tools.jackson.databind.JsonNode;
@@ -14,7 +15,7 @@ public class GuideJsonNormalize {
     private static final String[] RECIPE_FIELDS = {"recipe", "recipe2", "recipe3", "recipe4"};
     private static final String[] TEXT_FIELDS = {"text", "text2", "text3", "text4"};
 
-    public static Map<String, byte[]> normalizeFiles(Map<String, byte[]> files) {
+    public static Map<String, byte[]> normalizeFiles(Map<String, byte[]> files, DumpWriter writer) {
         if (files == null || files.isEmpty()) {
             return Map.of();
         }
@@ -27,10 +28,10 @@ public class GuideJsonNormalize {
                 continue;
             }
             try {
-                JsonNode tree = DumpWriter.readTree(new String(bytes, StandardCharsets.UTF_8));
+                JsonNode tree = DumpJson.readTree(new String(bytes, StandardCharsets.UTF_8));
                 if (tree != null && tree.isObject()) {
                     normalizeObject((ObjectNode) tree);
-                    out.put(relative, DumpWriter.toJsonBytes(tree));
+                    out.put(relative, writer.toJsonBytes(tree));
                 } else {
                     out.put(relative, bytes);
                 }

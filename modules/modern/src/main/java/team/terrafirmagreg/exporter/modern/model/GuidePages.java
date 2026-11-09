@@ -8,9 +8,9 @@ import java.util.List;
 import java.util.Map;
 import lombok.experimental.UtilityClass;
 import team.terrafirmagreg.exporter.contract.id.ResourceId;
+import team.terrafirmagreg.exporter.data.guide.GuideJsonCache;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
-import team.terrafirmagreg.exporter.dump.io.DumpWriter;
-import team.terrafirmagreg.exporter.engine.output.GuideJsonCache;
+import team.terrafirmagreg.exporter.dump.io.DumpJson;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -50,7 +50,7 @@ public class GuidePages {
         for (Path file : guideEntryFiles(layout)) {
             JsonNode root;
             try {
-                root = DumpWriter.readTree(Files.readString(file));
+                root = DumpJson.readTree(Files.readString(file));
             } catch (Exception ignored) {
                 continue;
             }

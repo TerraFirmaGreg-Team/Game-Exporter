@@ -9,20 +9,20 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.util.UUID;
-import team.terrafirmagreg.exporter.contract.artifact.ArtifactAddress;
-import team.terrafirmagreg.exporter.contract.artifact.ArtifactCatalog;
-import team.terrafirmagreg.exporter.contract.artifact.ArtifactCatalogBuilder;
-import team.terrafirmagreg.exporter.contract.artifact.ArtifactDescriptor;
 import team.terrafirmagreg.exporter.dump.DumpFiles;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
+import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
+import team.terrafirmagreg.exporter.dump.artifact.ArtifactCatalog;
+import team.terrafirmagreg.exporter.dump.artifact.ArtifactCatalogBuilder;
+import team.terrafirmagreg.exporter.dump.artifact.ArtifactDescriptor;
 import team.terrafirmagreg.exporter.dump.io.ArtifactAddressRenderer;
-import team.terrafirmagreg.exporter.dump.io.ArtifactDigestCache;
-import team.terrafirmagreg.exporter.dump.io.WrittenFiles;
+import team.terrafirmagreg.exporter.dump.io.DumpWriter;
 
 public final class DumpTransaction implements AutoCloseable {
     private final Path destination;
     private final String generationId;
     private final Path generationRoot;
+    private final DumpWriter jsonWriter;
     private final ArtifactCatalogBuilder catalog = new ArtifactCatalogBuilder();
     private final FileChannel lockChannel;
     private final FileLock destinationLock;
@@ -37,23 +37,28 @@ public final class DumpTransaction implements AutoCloseable {
             Path destination,
             String generationId,
             Path generationRoot,
+            DumpWriter jsonWriter,
             FileChannel lockChannel,
             FileLock destinationLock)
             throws IOException {
         this.destination = destination;
         this.generationId = generationId;
         this.generationRoot = generationRoot;
+        this.jsonWriter = jsonWriter;
         this.lockChannel = lockChannel;
         this.destinationLock = destinationLock;
         ArtifactAddressRenderer renderer = new ArtifactAddressRenderer(generationRoot);
         this.writer = new ArtifactWriter(renderer, catalog, stateMachine);
-        this.manifestFinalizer = new ManifestFinalizer(writer, catalog, stateMachine);
+        this.manifestFinalizer = new ManifestFinalizer(writer, jsonWriter, catalog, stateMachine);
         this.publisher = new GenerationPublisher(destination, generationRoot, stateMachine);
         Files.createDirectories(generationRoot);
-        WrittenFiles.open(generationRoot);
     }
 
     public static DumpTransaction open(Path destination) throws IOException {
+        return open(destination, false);
+    }
+
+    public static DumpTransaction open(Path destination, boolean prettyJson) throws IOException {
         Path output = destination.toAbsolutePath().normalize();
         Path parent = output.getParent();
         if (parent == null) {
@@ -82,7 +87,7 @@ public final class DumpTransaction implements AutoCloseable {
             }
             DumpFiles.deleteRecursively(backup);
             DumpFiles.deleteRecursively(generation);
-            return new DumpTransaction(output, id, generation, channel, lock);
+            return new DumpTransaction(output, id, generation, new DumpWriter(prettyJson), channel, lock);
         } catch (IOException | RuntimeException e) {
             lock.release();
             channel.close();
@@ -101,10 +106,6 @@ public final class DumpTransaction implements AutoCloseable {
     public synchronized ArtifactDescriptor write(ArtifactAddress address, byte[] content, String mediaType)
             throws IOException {
         return writer.write(address, content, mediaType);
-    }
-
-    public ArtifactDescriptor commitExisting(ArtifactAddress address, String mediaType) throws IOException {
-        return writer.commitExisting(address, mediaType);
     }
 
     public synchronized void contentCommitted() {
@@ -129,7 +130,7 @@ public final class DumpTransaction implements AutoCloseable {
     }
 
     public DumpLayout layout() {
-        return new DumpLayout(generationRoot);
+        return new DumpLayout(generationRoot, jsonWriter, writer);
     }
 
     public Path destination() {
@@ -154,8 +155,6 @@ public final class DumpTransaction implements AutoCloseable {
             return;
         }
         closed = true;
-        ArtifactDigestCache.forgetUnder(generationRoot);
-        WrittenFiles.close(generationRoot);
         IOException failure = null;
         if (stateMachine.get() != State.PUBLISHED) {
             try {

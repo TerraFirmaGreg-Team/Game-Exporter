@@ -15,6 +15,7 @@ import team.terrafirmagreg.exporter.contract.dto.guide.GuideEntry;
 import team.terrafirmagreg.exporter.contract.schema.DumpSchemas;
 import team.terrafirmagreg.exporter.contract.text.LangExtractor;
 import team.terrafirmagreg.exporter.dump.DumpFiles;
+import team.terrafirmagreg.exporter.dump.io.DumpJson;
 import team.terrafirmagreg.exporter.dump.io.DumpWriter;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.JsonNodeFactory;
@@ -30,8 +31,9 @@ public class GuideNormalize {
             String bookPath,
             Map<String, byte[]> files,
             LangExtractor extractor,
-            List<String> languages) {
-        Map<String, byte[]> normalized = GuideJsonNormalize.normalizeFiles(files);
+            List<String> languages,
+            DumpWriter writer) {
+        Map<String, byte[]> normalized = GuideJsonNormalize.normalizeFiles(files, writer);
         Map<String, byte[]> out = new LinkedHashMap<>();
         if (normalized.isEmpty()) {
             return out;
@@ -86,7 +88,7 @@ public class GuideNormalize {
                     peers(versions, lang),
                     extractor);
             GuideCategory record = GuideRecords.categoryRecord(canonical);
-            out.put("categories/" + categoryId + ".json", DumpWriter.toJsonBytes(record));
+            out.put("categories/" + categoryId + ".json", writer.toJsonBytes(record));
             categoryPointers.put(categoryId, "categories/" + categoryId + ".json");
         }
 
@@ -110,7 +112,7 @@ public class GuideNormalize {
             entryPointers.put(entryId, "entries/" + bucket + ".json");
         }
         for (Map.Entry<String, Map<String, GuideEntry>> bucket : buckets.entrySet()) {
-            out.put("entries/" + bucket.getKey() + ".json", DumpWriter.toJsonBytes(bucket.getValue()));
+            out.put("entries/" + bucket.getKey() + ".json", writer.toJsonBytes(bucket.getValue()));
         }
 
         Map<String, ObjectNode> bookDocs = new LinkedHashMap<>();
@@ -155,7 +157,7 @@ public class GuideNormalize {
                 GuideJsonFields.stringMapOrNull(bookDoc, "macros"),
                 GuideJsonFields.stringOrNull(bookDoc, "model"),
                 extensions.isEmpty() ? null : extensions);
-        out.put("book.json", DumpWriter.toJsonBytes(book));
+        out.put("book.json", writer.toJsonBytes(book));
         return out;
     }
 
@@ -263,7 +265,7 @@ public class GuideNormalize {
             return JsonNodeFactory.instance.objectNode();
         }
         try {
-            JsonNode element = DumpWriter.readTree(new String(bytes, StandardCharsets.UTF_8));
+            JsonNode element = DumpJson.readTree(new String(bytes, StandardCharsets.UTF_8));
             return element != null && element.isObject() ? (ObjectNode) element : JsonNodeFactory.instance.objectNode();
         } catch (Exception ignored) {
             return JsonNodeFactory.instance.objectNode();

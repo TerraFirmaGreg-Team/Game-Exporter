@@ -36,15 +36,17 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraftforge.registries.ForgeRegistries;
 import org.joml.Matrix4f;
 import team.terrafirmagreg.exporter.assets.atlas.ArgbImage;
+import team.terrafirmagreg.exporter.assets.texture.TextureCopy;
 import team.terrafirmagreg.exporter.contract.id.StackId;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
+import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
 import team.terrafirmagreg.exporter.dump.io.DumpHashes;
 import team.terrafirmagreg.exporter.dump.io.DumpImage;
 import team.terrafirmagreg.exporter.modern.mixin.TextureManagerAccessor;
 import team.terrafirmagreg.exporter.modern.texture.BlockAtlasCache;
 import team.terrafirmagreg.exporter.modern.texture.OffScreenRenderer;
 import team.terrafirmagreg.exporter.util.ExportLog;
-import team.terrafirmagreg.exporter.util.SnbtToJson;
+import team.terrafirmagreg.exporter.util.snbt.SnbtToJson;
 import tools.jackson.databind.JsonNode;
 
 @UtilityClass
@@ -150,12 +152,12 @@ public class EntityPreviews {
                 return;
             }
             Path file = layout.entityTexture(id.getNamespace(), entityPath);
-            DumpImage.write(
-                    file,
-                    ArgbImage.fromArgb(
+            layout.write(
+                    TextureCopy.address(layout, file),
+                    DumpImage.encode(ArgbImage.fromArgb(
                             ArgbImage.crop(argb, 256, bounds[0], bounds[1], bounds[2], bounds[3]),
                             bounds[2],
-                            bounds[3]));
+                            bounds[3])));
             Map<String, Object> rec = new LinkedHashMap<>();
             writeEntityGlb(layout, client, dispatcher, entity, id, entityPath).ifPresent(result -> {
                 rec.put("glb", layout.relative(result.glb()));
@@ -324,7 +326,16 @@ public class EntityPreviews {
         try {
             Map<String, BlockAtlasCache.Result> pages = BlockAtlasCache.ensure(
                     layout, null, capture.mesh().sprites(), sprite -> loadTexture(client, sprite));
-            GlbWriter.write(glb, capture.mesh(), pages);
+            byte[] glbBytes = GlbWriter.encode(glb, capture.mesh(), pages);
+            if (glbBytes == null) {
+                return Optional.empty();
+            }
+            layout.write(
+                    new ArtifactAddress.Asset(
+                            id.getNamespace(),
+                            id.getNamespace() + ":entity/" + entityPath + ".glb",
+                            ArtifactAddress.AssetKind.MODEL),
+                    glbBytes);
             List<Path> textures = new ArrayList<>();
             for (BlockAtlasCache.Result page : pages.values()) {
                 textures.add(page.png());

@@ -16,8 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import lombok.experimental.UtilityClass;
-import team.terrafirmagreg.exporter.dump.DumpFiles;
-import team.terrafirmagreg.exporter.dump.io.DumpWriter;
+import team.terrafirmagreg.exporter.dump.io.DumpJson;
 import team.terrafirmagreg.exporter.modern.texture.BlockAtlasCache;
 
 @UtilityClass
@@ -158,9 +157,9 @@ public class GlbWriter {
         }
     }
 
-    public static void write(Path file, Mesh mesh, Map<String, BlockAtlasCache.Result> atlases) throws IOException {
+    public static byte[] encode(Path file, Mesh mesh, Map<String, BlockAtlasCache.Result> atlases) throws IOException {
         if (mesh.isEmpty()) {
-            return;
+            return null;
         }
         mesh.remapUvs(atlases);
 
@@ -253,7 +252,7 @@ public class GlbWriter {
         gltf.put("bufferViews", bufferViews);
         gltf.put("buffers", List.of(Map.of("byteLength", offset)));
 
-        byte[] json = DumpWriter.toCompactJsonBytes(gltf);
+        byte[] json = DumpJson.toCompactJsonBytes(gltf);
         int jsonPad = pad(json.length);
         int total = 12 + 8 + jsonPad + 8 + offset;
         ByteBuffer out = ByteBuffer.allocate(total).order(ByteOrder.LITTLE_ENDIAN);
@@ -270,7 +269,7 @@ public class GlbWriter {
         out.putInt(BIN);
         out.put(bin.array());
 
-        DumpFiles.write(file, out.array());
+        return out.array();
     }
 
     private static List<Map<String, Object>> materialRecords(Map<String, Integer> materials) {

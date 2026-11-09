@@ -2,7 +2,6 @@ package team.terrafirmagreg.exporter.data.recipe;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,7 +24,6 @@ import team.terrafirmagreg.exporter.data.recipe.capture.RecipeCardSink;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
 import team.terrafirmagreg.exporter.dump.io.DumpHashes;
 import team.terrafirmagreg.exporter.dump.io.DumpImage;
-import team.terrafirmagreg.exporter.dump.io.WrittenFiles;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
 import team.terrafirmagreg.exporter.util.ExportLog;
 
@@ -187,8 +185,7 @@ final class StreamingCardSink implements RecipeCardSink {
         imageSrcs = Map.copyOf(srcs);
         for (Path orphan : orphans) {
             try {
-                Files.deleteIfExists(orphan);
-                WrittenFiles.discard(orphan);
+                layout.discard(RecipeComponent.recipeImageArtifact("", layout.relative(orphan)));
             } catch (IOException e) {
                 warnCap.warn("card shared-file cleanup {} failed: {}", orphan.getFileName(), e.toString());
             }
@@ -261,7 +258,9 @@ final class StreamingCardSink implements RecipeCardSink {
     }
 
     private void write(Path file, Prepared card) throws IOException {
-        DumpImage.write(file, ArgbImage.fromArgb(card.argb(), card.width(), card.height()), DumpImage.Mode.CARD);
+        layout.write(
+                RecipeComponent.recipeImageArtifact("", layout.relative(file)),
+                DumpImage.encode(ArgbImage.fromArgb(card.argb(), card.width(), card.height()), DumpImage.Mode.CARD));
         queued.incrementAndGet();
     }
 

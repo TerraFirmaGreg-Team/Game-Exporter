@@ -4,7 +4,7 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.TreeMap;
 import lombok.experimental.UtilityClass;
-import team.terrafirmagreg.exporter.config.ExportConfig;
+import team.terrafirmagreg.exporter.config.pack.Storage;
 import team.terrafirmagreg.exporter.contract.dto.manifest.PackInfo;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
 import team.terrafirmagreg.exporter.engine.spec.ExportSpec;
@@ -16,8 +16,8 @@ import team.terrafirmagreg.exporter.util.ExportLog;
 public class StoragePublish {
     private static final ExportLog.Tagged LOG = ExportLog.tagged("storage");
 
-    public static void run(ExportSpec request, Path dumpRoot, RunScope scope) {
-        StorageOptions options = StorageOptions.of(ExportConfig.storage);
+    public static void run(Storage storage, ExportSpec request, Path dumpRoot, RunScope scope) {
+        StorageOptions options = StorageOptions.of(storage);
         if (!options.enabled()) {
             LOG.info("disabled (storage.type=off)");
             return;

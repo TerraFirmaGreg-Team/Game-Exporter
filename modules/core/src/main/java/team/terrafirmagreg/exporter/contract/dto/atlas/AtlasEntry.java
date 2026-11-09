@@ -5,7 +5,7 @@ import team.terrafirmagreg.exporter.contract.id.ResourceId;
 import team.terrafirmagreg.exporter.contract.id.StackId;
 import team.terrafirmagreg.exporter.contract.ref.ReferenceKind;
 import team.terrafirmagreg.exporter.contract.ref.TaggedReference;
-import team.terrafirmagreg.exporter.util.SnbtToJson;
+import team.terrafirmagreg.exporter.util.snbt.SnbtToJson;
 import tools.jackson.databind.JsonNode;
 
 public record AtlasEntry(

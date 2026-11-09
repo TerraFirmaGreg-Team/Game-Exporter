@@ -12,29 +12,26 @@ import java.util.TreeSet;
 import team.terrafirmagreg.exporter.contract.dto.recipe.*;
 import team.terrafirmagreg.exporter.contract.ref.ReferenceKind;
 import team.terrafirmagreg.exporter.contract.ref.TaggedReference;
+import team.terrafirmagreg.exporter.data.registry.RegistryChannels;
 import team.terrafirmagreg.exporter.data.tag.dump.TagDump;
-import team.terrafirmagreg.exporter.engine.output.LinkPayload;
-import team.terrafirmagreg.exporter.engine.output.VerticalOutputs;
-import team.terrafirmagreg.exporter.engine.plan.ExecutionContext;
-import team.terrafirmagreg.exporter.engine.spec.ComponentId;
+import team.terrafirmagreg.exporter.engine.run.ExecutionContext;
+import team.terrafirmagreg.exporter.engine.spec.ComponentKeys;
 import team.terrafirmagreg.exporter.engine.spec.ExportSpec;
 
 public final class RecipeEdges {
     public static final RecipeEdges EMPTY = new RecipeEdges(Map.of(), Map.of(), Map.of(), Map.of());
 
     public static RecipeEdges from(ExportSpec request, ExecutionContext context) {
-        if (!request.resolvedComponents().contains(ComponentId.DATA_RECIPES)) {
+        if (!request.resolvedComponents().contains(ComponentKeys.DATA_RECIPES)) {
             return EMPTY;
         }
-        LinkPayload recipes =
-                VerticalOutputs.require(context, ComponentId.DATA_RECIPES).payload();
+        Map<String, RecipeEntry> recipes =
+                context.findMerged(RecipeChannels.BY_ID).orElse(Map.of());
         List<RecipeCategory> categories = List.of();
-        if (request.resolvedComponents().contains(ComponentId.DATA_RECIPE_CATEGORIES)) {
-            categories = VerticalOutputs.require(context, ComponentId.DATA_RECIPE_CATEGORIES)
-                    .payload()
-                    .categories();
+        if (request.resolvedComponents().contains(ComponentKeys.DATA_RECIPE_CATEGORIES)) {
+            categories = context.findMerged(RegistryChannels.CATEGORIES).orElse(List.of());
         }
-        return invert(recipes.recipes(), categories);
+        return invert(recipes, categories);
     }
 
     private final Map<String, List<String>> usedBy;

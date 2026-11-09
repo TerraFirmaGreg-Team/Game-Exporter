@@ -10,6 +10,7 @@ import org.junit.jupiter.api.io.TempDir;
 import team.terrafirmagreg.exporter.contract.dto.quest.QuestChapter;
 import team.terrafirmagreg.exporter.contract.text.LangExtractor;
 import team.terrafirmagreg.exporter.data.quest.dump.QuestLangExtractor;
+import team.terrafirmagreg.exporter.dump.io.DumpJson;
 import team.terrafirmagreg.exporter.dump.io.DumpWriter;
 import team.terrafirmagreg.exporter.engine.demand.ResourceDemand;
 import tools.jackson.databind.JsonNode;
@@ -57,27 +58,27 @@ class QuestChapterWriteTest {
 
     @Test
     void roundTripsChapterThroughDto() throws IOException {
-        ObjectNode source = (ObjectNode) DumpWriter.readTree(CHAPTER);
+        ObjectNode source = (ObjectNode) DumpJson.readTree(CHAPTER);
         Path out = tmp.resolve("chapter.json");
-        DumpWriter.writeTreeOrValue(out, source, QuestChapter.class);
-        JsonNode written = DumpWriter.readTree(out);
+        DumpWriter.COMPACT.writeTreeOrValue(out, source, QuestChapter.class);
+        JsonNode written = DumpJson.readTree(out);
         assertEquals(source, written);
     }
 
     @Test
     void unknownFieldsSurviveExtras() throws IOException {
-        ObjectNode source = (ObjectNode) DumpWriter.readTree(CHAPTER);
-        QuestChapter chapter = DumpWriter.mapper().treeToValue(source, QuestChapter.class);
+        ObjectNode source = (ObjectNode) DumpJson.readTree(CHAPTER);
+        QuestChapter chapter = DumpJson.mapper().treeToValue(source, QuestChapter.class);
         assertTrue(chapter.extras().containsKey("vendorChapterExtra"));
         assertTrue(chapter.quests().get("q1").extras().containsKey("vendorFlag"));
         assertEquals(
                 source.get("vendorChapterExtra"),
-                DumpWriter.mapper().valueToTree(chapter.extras().get("vendorChapterExtra")));
+                DumpJson.mapper().valueToTree(chapter.extras().get("vendorChapterExtra")));
     }
 
     @Test
     void arraySubtitleAndScalarDescriptionBindAfterLangExtract() throws IOException {
-        ObjectNode source = (ObjectNode) DumpWriter.readTree("""
+        ObjectNode source = (ObjectNode) DumpJson.readTree("""
                 {
                   "id": "chapter1",
                   "title": "Quests",
@@ -96,8 +97,8 @@ class QuestChapterWriteTest {
         LangExtractor extractor = new LangExtractor(lang -> Set.of());
         QuestLangExtractor.chapter(source, "tfg", "en_us", extractor);
         Path out = tmp.resolve("chapter.json");
-        DumpWriter.writeTreeOrValue(out, source, QuestChapter.class);
-        JsonNode written = DumpWriter.readTree(out);
+        DumpWriter.COMPACT.writeTreeOrValue(out, source, QuestChapter.class);
+        JsonNode written = DumpJson.readTree(out);
         assertEquals("{quest.tfg.chapter1.subtitle}", written.get("subtitle").asString());
         assertEquals("Line one\nLine two", extractor.generated().get("en_us").get("quest.tfg.chapter1.subtitle"));
         assertTrue(written.get("description").isArray());
@@ -112,17 +113,17 @@ class QuestChapterWriteTest {
 
     @Test
     void malformedChapterFallsBackToRaw() throws IOException {
-        ObjectNode source = (ObjectNode) DumpWriter.readTree("""
+        ObjectNode source = (ObjectNode) DumpJson.readTree("""
                 {"id": "bad", "quests": [{"not": "an object map"}]}
                 """);
         Path out = tmp.resolve("bad.json");
-        DumpWriter.writeTreeOrValue(out, source, QuestChapter.class);
-        assertEquals(source, DumpWriter.readTree(out));
+        DumpWriter.COMPACT.writeTreeOrValue(out, source, QuestChapter.class);
+        assertEquals(source, DumpJson.readTree(out));
     }
 
     @Test
     void filterLiftsFromItemTagToTask() throws IOException {
-        ObjectNode source = (ObjectNode) DumpWriter.readTree("""
+        ObjectNode source = (ObjectNode) DumpJson.readTree("""
                 {
                   "id": "chapter1",
                   "icon": {"kind": "item", "id": "minecraft:book"},
@@ -154,10 +155,15 @@ class QuestChapterWriteTest {
         assertNull(ref.get("tag"));
         assertNull(ref.get("filter"));
         Path out = tmp.resolve("filter.json");
-        DumpWriter.writeTreeOrValue(out, source, QuestChapter.class);
-        JsonNode written = DumpWriter.readTree(out);
+        DumpWriter.COMPACT.writeTreeOrValue(out, source, QuestChapter.class);
+        JsonNode written = DumpJson.readTree(out);
         assertEquals(
                 "or(item(create:stressometer)item(create:speedometer))",
-                written.get("quests").get("q1").get("tasks").get("t1").get("filter").asString());
+                written.get("quests")
+                        .get("q1")
+                        .get("tasks")
+                        .get("t1")
+                        .get("filter")
+                        .asString());
     }
 }

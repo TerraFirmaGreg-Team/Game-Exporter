@@ -10,10 +10,10 @@ import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Map;
 import lombok.experimental.UtilityClass;
-import team.terrafirmagreg.exporter.dump.io.DumpWriter;
+import team.terrafirmagreg.exporter.dump.io.DumpJson;
 import team.terrafirmagreg.exporter.engine.spec.options.ModIdFilter;
 import team.terrafirmagreg.exporter.util.Io;
-import team.terrafirmagreg.exporter.util.SnbtFiles;
+import team.terrafirmagreg.exporter.util.snbt.SnbtFiles;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -74,7 +74,7 @@ public class LangMerge {
             return;
         }
         try (Reader reader = Files.newBufferedReader(file)) {
-            JsonNode element = DumpWriter.readGameTree(reader);
+            JsonNode element = DumpJson.readGameTree(reader);
             if (element != null && element.isObject()) {
                 mergeJsonObject(into, (ObjectNode) element);
             }

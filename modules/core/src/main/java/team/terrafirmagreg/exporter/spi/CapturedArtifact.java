@@ -2,7 +2,7 @@ package team.terrafirmagreg.exporter.spi;
 
 import java.util.Arrays;
 import java.util.Objects;
-import team.terrafirmagreg.exporter.contract.artifact.ArtifactAddress;
+import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
 
 public record CapturedArtifact(ArtifactAddress address, byte[] bytes) {
     public CapturedArtifact {

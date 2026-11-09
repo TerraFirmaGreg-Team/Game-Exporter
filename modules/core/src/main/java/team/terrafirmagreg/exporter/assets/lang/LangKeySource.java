@@ -10,9 +10,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import lombok.experimental.UtilityClass;
-import team.terrafirmagreg.exporter.dump.io.DumpWriter;
+import team.terrafirmagreg.exporter.dump.io.DumpJson;
 import team.terrafirmagreg.exporter.util.ExportLog;
-import team.terrafirmagreg.exporter.util.SnbtFiles;
+import team.terrafirmagreg.exporter.util.snbt.SnbtFiles;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -89,7 +89,7 @@ public class LangKeySource {
 
     public static Set<String> jsonKeys(Reader reader) throws IOException {
         Map<String, Object> into = new Object2ObjectLinkedOpenHashMap<>();
-        JsonNode element = DumpWriter.readGameTree(reader);
+        JsonNode element = DumpJson.readGameTree(reader);
         if (element != null && element.isObject()) {
             LangMerge.mergeJsonObject(into, (ObjectNode) element);
         }

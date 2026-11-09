@@ -38,7 +38,7 @@ public final class Textures extends Filter {
                 includeMods.get(),
                 excludeMods.get(),
                 ComponentScope.parse(scope.get()),
-                ProfileNormalize.parseComponentIds(
+                ProfileNormalize.parseComponentKeys(
                         ProfileNormalize.normalizeFrom(fromComponents.get(), TexturesComponentConfig.DEFAULT_FROM)),
                 additionalMods.get(),
                 include.get(),

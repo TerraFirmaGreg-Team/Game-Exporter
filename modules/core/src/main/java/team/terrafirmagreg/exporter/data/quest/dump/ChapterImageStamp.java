@@ -7,7 +7,8 @@ import lombok.experimental.UtilityClass;
 import team.terrafirmagreg.exporter.dump.AssetPaths;
 import team.terrafirmagreg.exporter.dump.DataPaths;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
-import team.terrafirmagreg.exporter.dump.io.DumpWriter;
+import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
+import team.terrafirmagreg.exporter.dump.io.DumpJson;
 import team.terrafirmagreg.exporter.util.JsonNodes;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
@@ -28,12 +29,17 @@ public class ChapterImageStamp {
                     continue;
                 }
                 try (var files = Files.walk(chapters)) {
+                    String namespace = modDir.getFileName().toString();
                     for (Path file : files.filter(
                                     path -> path.getFileName().toString().endsWith(".json"))
                             .toList()) {
-                        JsonNode tree = DumpWriter.readTree(file);
+                        JsonNode tree = DumpJson.readTree(file);
                         if (stampImages(tree, layout)) {
-                            DumpWriter.writeJson(file, tree);
+                            String relative = "chapters/"
+                                    + chapters.relativize(file).toString().replace('\\', '/');
+                            layout.writeJson(
+                                    new ArtifactAddress.Data(namespace, relative, ArtifactAddress.DataKind.QUEST),
+                                    tree);
                         }
                     }
                 }
@@ -83,14 +89,14 @@ public class ChapterImageStamp {
             return false;
         }
         try {
-            JsonNode animation = DumpWriter.readTree(mcmeta).path("animation");
+            JsonNode animation = DumpJson.readTree(mcmeta).path("animation");
             if (animation.isObject()) {
                 if (animation.has("frametime")) {
                     frameTime = Math.max(1, animation.get("frametime").asInt(2));
                 }
                 JsonNode frames = animation.get("frames");
                 if (frames != null && frames.isArray() && frames.size() > 0) {
-                    sequence = DumpWriter.mapper().createArrayNode();
+                    sequence = DumpJson.mapper().createArrayNode();
                     for (JsonNode frame : frames) {
                         if (frame.isNumber()) {
                             sequence.add(frame.asInt());

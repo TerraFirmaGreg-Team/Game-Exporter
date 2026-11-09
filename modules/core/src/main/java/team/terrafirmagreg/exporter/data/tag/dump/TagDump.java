@@ -1,7 +1,6 @@
 package team.terrafirmagreg.exporter.data.tag.dump;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -10,7 +9,9 @@ import team.terrafirmagreg.exporter.contract.dto.tag.TagEntry;
 import team.terrafirmagreg.exporter.contract.id.EntryKind;
 import team.terrafirmagreg.exporter.contract.id.ResourceId;
 import team.terrafirmagreg.exporter.data.recipe.EdgeTable;
-import team.terrafirmagreg.exporter.dump.io.DumpWriter;
+import team.terrafirmagreg.exporter.dump.DumpLayout;
+import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
+import team.terrafirmagreg.exporter.dump.io.DumpJson;
 import tools.jackson.databind.node.ObjectNode;
 
 @UtilityClass
@@ -20,7 +21,7 @@ public class TagDump {
         return parse(dumpId).namespace;
     }
 
-    public static void write(Path file, Map<String, TagEntry> tags) throws IOException {
+    public static void write(DumpLayout layout, Map<String, TagEntry> tags) throws IOException {
         Map<String, TagEntry> out = new LinkedHashMap<>();
         for (Map.Entry<String, TagEntry> e : tags.entrySet()) {
             Parsed parsed = parse(e.getKey());
@@ -35,8 +36,8 @@ public class TagDump {
             List<String> producedBy = tagEntry != null ? tagEntry.producedBy() : List.of();
             out.put(e.getKey(), new TagEntry(id, parsed.registry, replace, members, usedBy, producedBy));
         }
-        DumpWriter.writeJson(
-                file, EdgeTable.intern((ObjectNode) DumpWriter.mapper().valueToTree(out)));
+        layout.writeJson(new ArtifactAddress.Root("registry/tags"), EdgeTable.intern((ObjectNode)
+                DumpJson.mapper().valueToTree(out)));
     }
 
     public static String dumpId(String registry, String tagId) {

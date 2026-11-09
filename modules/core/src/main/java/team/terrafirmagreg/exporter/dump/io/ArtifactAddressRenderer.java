@@ -1,12 +1,12 @@
 package team.terrafirmagreg.exporter.dump.io;
 
 import java.nio.file.Path;
-import team.terrafirmagreg.exporter.contract.artifact.ArtifactAddress;
-import team.terrafirmagreg.exporter.contract.artifact.ArtifactAddress.Asset;
-import team.terrafirmagreg.exporter.contract.artifact.ArtifactAddress.Data;
 import team.terrafirmagreg.exporter.contract.id.ResourceId;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
 import team.terrafirmagreg.exporter.dump.DumpPaths;
+import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
+import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress.Asset;
+import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress.Data;
 
 public final class ArtifactAddressRenderer {
     private final Path root;
@@ -21,7 +21,6 @@ public final class ArtifactAddressRenderer {
                 + switch (asset.kind()) {
                     case LANGUAGE -> "lang/" + stripJson(asset.canonicalId()) + ".json";
                     case KEYBINDS -> "keybinds.json";
-                    case ATLAS -> "atlases/" + stripJson(asset.canonicalId()) + ".json";
                     case TEXTURE -> texturePath(asset);
                     case MODEL -> modelPath(asset);
                 };

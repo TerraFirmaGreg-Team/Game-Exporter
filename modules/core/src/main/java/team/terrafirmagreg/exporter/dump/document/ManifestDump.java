@@ -2,12 +2,11 @@ package team.terrafirmagreg.exporter.dump.document;
 
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import lombok.experimental.UtilityClass;
-import team.terrafirmagreg.exporter.contract.artifact.ArtifactAddress;
-import team.terrafirmagreg.exporter.contract.artifact.ArtifactCatalog;
+import team.terrafirmagreg.exporter.assets.lang.LangChannels;
+import team.terrafirmagreg.exporter.contract.dto.group.StackGroup;
 import team.terrafirmagreg.exporter.contract.dto.manifest.DumpIndexes;
 import team.terrafirmagreg.exporter.contract.dto.manifest.DumpManifest;
 import team.terrafirmagreg.exporter.contract.dto.manifest.DumpProducer;
@@ -24,24 +23,27 @@ import team.terrafirmagreg.exporter.contract.id.ResourceId;
 import team.terrafirmagreg.exporter.contract.schema.DumpSchemas;
 import team.terrafirmagreg.exporter.contract.text.Display;
 import team.terrafirmagreg.exporter.contract.text.LangKeys;
+import team.terrafirmagreg.exporter.data.recipe.RecipeChannels;
 import team.terrafirmagreg.exporter.data.recipe.RecipeEdges;
 import team.terrafirmagreg.exporter.data.recipe.RecipeKey;
 import team.terrafirmagreg.exporter.data.recipe.dump.RecipeDump;
+import team.terrafirmagreg.exporter.data.registry.RegistryChannels;
 import team.terrafirmagreg.exporter.data.registry.dump.GroupsDump;
 import team.terrafirmagreg.exporter.dump.DataPaths;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
-import team.terrafirmagreg.exporter.dump.io.DumpWriter;
-import team.terrafirmagreg.exporter.engine.output.ComponentOutcome;
-import team.terrafirmagreg.exporter.engine.output.ComponentOutcome.Status;
-import team.terrafirmagreg.exporter.engine.output.LinkPayload;
+import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
+import team.terrafirmagreg.exporter.dump.artifact.ArtifactCatalog;
+import team.terrafirmagreg.exporter.engine.report.ComponentResult;
+import team.terrafirmagreg.exporter.engine.report.ComponentResult.Status;
+import team.terrafirmagreg.exporter.engine.report.RunMetrics;
+import team.terrafirmagreg.exporter.engine.run.ExecutionOutputs;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
 import team.terrafirmagreg.exporter.engine.run.RunTasks;
-import team.terrafirmagreg.exporter.engine.spec.ComponentId;
+import team.terrafirmagreg.exporter.engine.spec.ComponentKey;
 import team.terrafirmagreg.exporter.engine.spec.ExportSpec;
 import team.terrafirmagreg.exporter.engine.spec.ProductId;
 import team.terrafirmagreg.exporter.util.ExportLog;
 import team.terrafirmagreg.exporter.util.HumanFormat;
-import team.terrafirmagreg.exporter.util.RunMetrics;
 
 @UtilityClass
 public class ManifestDump {
@@ -52,8 +54,8 @@ public class ManifestDump {
             String platform,
             String minecraftVersion,
             ExportSpec request,
-            Map<ComponentId, ComponentOutcome> results,
-            LinkPayload payload,
+            Map<ComponentKey, ComponentResult> results,
+            ExecutionOutputs outputs,
             ArtifactCatalog catalog,
             RunScope session,
             String generation,
@@ -63,15 +65,15 @@ public class ManifestDump {
         RunMetrics.Stopwatch total = metrics.start("total");
         RunTasks tasks = session == null ? null : session.tasks();
         RunMetrics nodes = session == null ? metrics : session.metrics();
-        Map<String, String> modKeys = modDisplayKeys(results);
+        Map<String, String> modKeys = modDisplayKeys(outputs);
         RunMetrics.Stopwatch manifests = metrics.start("manifests");
         CompletableFuture<Set<String>> groupNamespaces = timed(
                 tasks,
                 nodes,
                 "manifests.groupsMs",
-                () -> GroupsDump.byNamespace(payload).keySet());
-        CompletableFuture<RecipeScan> scan = timed(tasks, nodes, "manifests.recipeScanMs", () -> recipeScan(payload));
-        CompletableFuture<List<String>> used = timed(tasks, nodes, "manifests.usedMs", () -> usedContent(payload));
+                () -> GroupsDump.byNamespace(groups(outputs)).keySet());
+        CompletableFuture<RecipeScan> scan = timed(tasks, nodes, "manifests.recipeScanMs", () -> recipeScan(outputs));
+        CompletableFuture<List<String>> used = timed(tasks, nodes, "manifests.usedMs", () -> usedContent(outputs));
         CompletableFuture<Map<String, String>> quests =
                 timed(tasks, nodes, "manifests.questsMs", () -> questPointers(layout, catalog));
         CompletableFuture<Void> schemas = timed(tasks, nodes, "manifests.schemaMs", () -> {
@@ -86,8 +88,8 @@ public class ManifestDump {
                         catalog,
                         request.languages(),
                         registryKinds,
-                        payload.namespaceLanguages(),
-                        payload.keybindNamespaces()));
+                        outputs.findMerged(LangChannels.NAMESPACE_LANGUAGES).orElse(Map.of()),
+                        outputs.findMerged(LangChannels.KEYBIND_NAMESPACES).orElse(Set.of())));
         CompletableFuture<CatalogProjection> projection = supply(tasks, () -> {
             CatalogProjection projected = RunTasks.await(projectionBase);
             projected.groups(RunTasks.await(groupNamespaces));
@@ -163,7 +165,7 @@ public class ManifestDump {
     private static void writeReport(
             DumpLayout layout,
             ExportSpec request,
-            Map<ComponentId, ComponentOutcome> results,
+            Map<ComponentKey, ComponentResult> results,
             RunScope session,
             String generation,
             ReportFiles files)
@@ -181,8 +183,8 @@ public class ManifestDump {
                 counters.put(e.getKey(), e.getValue());
             }
         }
-        DumpWriter.writeJson(
-                layout.report(),
+        layout.writeJson(
+                new ArtifactAddress.Meta("report"),
                 new DumpReport(
                         DumpSchemas.REPORT,
                         generation,
@@ -217,8 +219,14 @@ public class ManifestDump {
         return out;
     }
 
-    private static List<String> usedContent(LinkPayload payload) {
-        RecipeEdges edges = RecipeEdges.invert(payload.recipes(), payload.categories());
+    private static Map<String, List<StackGroup>> groups(ExecutionOutputs outputs) {
+        return outputs.findMerged(RegistryChannels.GROUPS).orElse(Map.of());
+    }
+
+    private static List<String> usedContent(ExecutionOutputs outputs) {
+        RecipeEdges edges = RecipeEdges.invert(
+                outputs.findMerged(RecipeChannels.BY_ID).orElse(Map.of()),
+                outputs.findMerged(RegistryChannels.CATEGORIES).orElse(List.of()));
         List<String> out = new ArrayList<>(edges.usedContent());
         for (String dumpId : edges.usedTags()) {
             String bare = tagBareId(dumpId);
@@ -240,10 +248,11 @@ public class ManifestDump {
 
     private record RecipeScan(Map<String, List<String>> categories, RecipeTypesIndex types) {}
 
-    private static RecipeScan recipeScan(LinkPayload payload) {
+    private static RecipeScan recipeScan(ExecutionOutputs outputs) {
         Map<String, List<String>> categories = new TreeMap<>();
         Map<String, TypeRows> rows = new TreeMap<>();
-        for (Map.Entry<String, RecipeEntry> e : payload.recipes().entrySet()) {
+        for (Map.Entry<String, RecipeEntry> e :
+                outputs.findMerged(RecipeChannels.BY_ID).orElse(Map.of()).entrySet()) {
             RecipeEntry body = e.getValue();
             String categoryPath = RecipeDump.categoryPath(body);
             if (categoryPath == null) {
@@ -296,16 +305,15 @@ public class ManifestDump {
         private final Map<String, String> files = new TreeMap<>();
     }
 
-    private static Map<String, String> modDisplayKeys(Map<ComponentId, ComponentOutcome> results) {
-        ComponentOutcome lang = results == null ? null : results.get(ComponentId.ASSETS_LANG);
-        return lang == null ? Map.of() : lang.extras().modDisplayKeys();
+    private static Map<String, String> modDisplayKeys(ExecutionOutputs outputs) {
+        return outputs.findMerged(LangChannels.MOD_KEYS).orElse(Map.of());
     }
 
     private static Map<String, ComponentRow> components(
-            ExportSpec request, Map<ComponentId, ComponentOutcome> results) {
+            ExportSpec request, Map<ComponentKey, ComponentResult> results) {
         Map<String, ComponentRow> components = new LinkedHashMap<>();
-        for (ComponentId id : request.resolvedComponents()) {
-            ComponentOutcome result = results.get(id);
+        for (ComponentKey id : request.resolvedComponents()) {
+            ComponentResult result = results.get(id);
             components.put(
                     id.dotted(),
                     new ComponentRow(
@@ -318,13 +326,13 @@ public class ManifestDump {
         return Collections.unmodifiableMap(components);
     }
 
-    private static Selection selection(List<ProductId> products, List<ComponentId> components) {
+    private static Selection selection(List<ProductId> products, List<ComponentKey> components) {
         List<String> productIds = new ArrayList<>();
         for (ProductId p : products) {
             productIds.add(p.id());
         }
         List<String> componentIds = new ArrayList<>();
-        for (ComponentId c : components) {
+        for (ComponentKey c : components) {
             componentIds.add(c.dotted());
         }
         return new Selection(productIds, componentIds);
@@ -337,32 +345,7 @@ public class ManifestDump {
             merged.putAll(rows);
         }
         if (!merged.isEmpty()) {
-            DumpWriter.writeJson(layout.registry("recipes"), merged);
+            layout.writeJson(new ArtifactAddress.Root("registry/recipes"), merged);
         }
-    }
-
-    public static List<ArtifactAddress> supportingAddresses(DumpLayout layout) throws IOException {
-        List<ArtifactAddress> addresses = new ArrayList<>();
-        addresses.add(new ArtifactAddress.Meta("report"));
-        addresses.addAll(SchemaDump.addresses());
-        addresses.addAll(rootFileAddresses(layout.registryDir(), "registry"));
-        return List.copyOf(addresses);
-    }
-
-    private static List<ArtifactAddress> rootFileAddresses(Path dir, String folder) throws IOException {
-        if (!Files.isDirectory(dir)) {
-            return List.of();
-        }
-        List<ArtifactAddress> addresses = new ArrayList<>();
-        try (var files = Files.list(dir)) {
-            for (Path file : files.filter(Files::isRegularFile).sorted().toList()) {
-                String name = file.getFileName().toString();
-                if (name.endsWith(".json")) {
-                    addresses.add(new ArtifactAddress.Root(
-                            folder + "/" + name.substring(0, name.length() - ".json".length())));
-                }
-            }
-        }
-        return addresses;
     }
 }

@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import team.terrafirmagreg.exporter.contract.dto.storage.ObjectsIndex;
 import team.terrafirmagreg.exporter.contract.dto.storage.VersionsIndex;
-import team.terrafirmagreg.exporter.dump.io.DumpWriter;
+import team.terrafirmagreg.exporter.dump.io.DumpJson;
 import team.terrafirmagreg.exporter.storage.local.LocalStorage;
 
 class StorageSyncTest {
@@ -74,7 +74,7 @@ class StorageSyncTest {
         assertTrue(keys.stream().anyMatch(k -> k.startsWith("pack/objects/tfc/") && k.endsWith(".webp")));
         assertTrue(keys.contains("pack/1.0.0/objects.json.gz"));
         assertTrue(keys.stream().noneMatch(k -> k.endsWith("/objects.json")));
-        ObjectsIndex index = DumpWriter.mapper()
+        ObjectsIndex index = DumpJson.mapper()
                 .readValue(gunzip(stored(storeRoot, "pack/1.0.0/objects.json.gz")), ObjectsIndex.class);
         assertTrue(index.files().get("data/tfc/items/x.json").startsWith("pack/objects/tfc/"));
         assertTrue(index.files().get("assets/tfc/textures/a.webp").startsWith("pack/objects/tfc/"));
@@ -103,7 +103,7 @@ class StorageSyncTest {
         byte[] manifestGz = stored(storeRoot, "pack/1.0.0/manifest.json.gz");
         assertNotNull(manifestGz);
         assertEquals("{\"pack\":{}}", gunzip(manifestGz));
-        ObjectsIndex index = DumpWriter.mapper()
+        ObjectsIndex index = DumpJson.mapper()
                 .readValue(gunzip(stored(storeRoot, "pack/1.0.0/objects.json.gz")), ObjectsIndex.class);
         assertTrue(index.files().get("manifest.json").endsWith(".gz"));
     }
@@ -115,10 +115,63 @@ class StorageSyncTest {
         LocalStorage target = new LocalStorage(storeRoot);
         sync(root, target, false);
         VersionsIndex versions =
-                DumpWriter.mapper().readValue(stored(storeRoot, "pack/versions.json"), VersionsIndex.class);
+                DumpJson.mapper().readValue(stored(storeRoot, "pack/versions.json"), VersionsIndex.class);
         assertEquals("pack", versions.pack());
         assertEquals("1.0.0", versions.latest());
         assertEquals(List.of("1.0.0"), versions.versions());
+    }
+
+    @Test
+    void latestStaysHighestSemverAcrossUploads() throws IOException {
+        Path root = dumpTree();
+        Path storeRoot = tmp.resolve("store");
+        LocalStorage target = new LocalStorage(storeRoot);
+        StorageSync.sync(target, new StorageJob(root, "pack", "0.13.18", options(false)));
+        StorageSync.sync(target, new StorageJob(root, "pack", "0.13.17", options(false)));
+        VersionsIndex versions =
+                DumpJson.mapper().readValue(stored(storeRoot, "pack/versions.json"), VersionsIndex.class);
+        assertEquals("0.13.18", versions.latest());
+        assertEquals(List.of("0.13.17", "0.13.18"), versions.versions());
+    }
+
+    @Test
+    void versionsListSortedBySemverNotLexically() throws IOException {
+        Path root = dumpTree();
+        Path storeRoot = tmp.resolve("store");
+        LocalStorage target = new LocalStorage(storeRoot);
+        StorageSync.sync(target, new StorageJob(root, "pack", "0.13.18", options(false)));
+        StorageSync.sync(target, new StorageJob(root, "pack", "0.13.9", options(false)));
+        VersionsIndex versions =
+                DumpJson.mapper().readValue(stored(storeRoot, "pack/versions.json"), VersionsIndex.class);
+        assertEquals(List.of("0.13.9", "0.13.18"), versions.versions());
+        assertEquals("0.13.18", versions.latest());
+    }
+
+    @Test
+    void nonSemverSegmentNeverBeatsReleaseLatest() throws IOException {
+        Path root = dumpTree();
+        Path storeRoot = tmp.resolve("store");
+        LocalStorage target = new LocalStorage(storeRoot);
+        StorageSync.sync(target, new StorageJob(root, "pack", "0.13.18", options(false)));
+        StorageSync.sync(target, new StorageJob(root, "pack", "nightly", options(false)));
+        VersionsIndex versions =
+                DumpJson.mapper().readValue(stored(storeRoot, "pack/versions.json"), VersionsIndex.class);
+        assertEquals("0.13.18", versions.latest());
+        assertTrue(versions.versions().contains("nightly"));
+    }
+
+    @Test
+    void updateLatestDisabledKeepsExistingLatest() throws IOException {
+        Path root = dumpTree();
+        Path storeRoot = tmp.resolve("store");
+        LocalStorage target = new LocalStorage(storeRoot);
+        StorageOptions noLatest = new StorageOptions("local", "", "", "", "", "", false, false, false, true, 4);
+        StorageSync.sync(target, new StorageJob(root, "pack", "0.13.18", options(false)));
+        StorageSync.sync(target, new StorageJob(root, "pack", "0.14.0", noLatest));
+        VersionsIndex versions =
+                DumpJson.mapper().readValue(stored(storeRoot, "pack/versions.json"), VersionsIndex.class);
+        assertEquals("0.13.18", versions.latest());
+        assertTrue(versions.versions().contains("0.14.0"));
     }
 
     @Test

@@ -1,22 +1,22 @@
 package team.terrafirmagreg.exporter.assets.model;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.*;
-import team.terrafirmagreg.exporter.contract.artifact.ArtifactAddress;
-import team.terrafirmagreg.exporter.dump.DumpFiles;
+import team.terrafirmagreg.exporter.data.guide.GuideChannels;
+import team.terrafirmagreg.exporter.data.guide.GuideJsonCache;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
-import team.terrafirmagreg.exporter.dump.io.ArtifactAddressRenderer;
 import team.terrafirmagreg.exporter.engine.demand.ResourceDemand;
-import team.terrafirmagreg.exporter.engine.output.ComponentOutcome;
-import team.terrafirmagreg.exporter.engine.output.ComponentOutcomeBuilder;
-import team.terrafirmagreg.exporter.engine.output.GuideJsonCache;
-import team.terrafirmagreg.exporter.engine.output.VerticalOutputs;
-import team.terrafirmagreg.exporter.engine.pipeline.ExportTask;
-import team.terrafirmagreg.exporter.engine.plan.Affinity;
-import team.terrafirmagreg.exporter.engine.plan.ExecutionContext;
+import team.terrafirmagreg.exporter.engine.graph.ExportComponent;
+import team.terrafirmagreg.exporter.engine.graph.NodeContext;
+import team.terrafirmagreg.exporter.engine.graph.OutputKey;
+import team.terrafirmagreg.exporter.engine.report.ComponentOutputs;
+import team.terrafirmagreg.exporter.engine.report.ComponentResult;
+import team.terrafirmagreg.exporter.engine.report.ComponentResultBuilder;
+import team.terrafirmagreg.exporter.engine.run.ExecutionContext;
+import team.terrafirmagreg.exporter.engine.run.Lane;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
-import team.terrafirmagreg.exporter.engine.spec.ComponentId;
+import team.terrafirmagreg.exporter.engine.spec.ComponentKey;
+import team.terrafirmagreg.exporter.engine.spec.ComponentKeys;
 import team.terrafirmagreg.exporter.engine.spec.EffectiveMods;
 import team.terrafirmagreg.exporter.engine.spec.ExportSpec;
 import team.terrafirmagreg.exporter.engine.spec.options.ModelsComponentConfig;
@@ -24,7 +24,7 @@ import team.terrafirmagreg.exporter.spi.CapturedArtifact;
 import team.terrafirmagreg.exporter.spi.MergePolicy;
 import team.terrafirmagreg.exporter.spi.SourceSet;
 
-public final class ModelComponent implements ExportTask {
+public final class ModelComponent implements ExportComponent {
     private final SourceSet<ModelSource> sources = new SourceSet<>("models", MergePolicy.UNION);
 
     public ModelComponent addSource(ModelSource source) {
@@ -33,8 +33,8 @@ public final class ModelComponent implements ExportTask {
     }
 
     @Override
-    public ComponentId id() {
-        return ComponentId.ASSETS_MODELS;
+    public ComponentKey id() {
+        return ComponentKeys.ASSETS_MODELS;
     }
 
     @Override
@@ -43,18 +43,17 @@ public final class ModelComponent implements ExportTask {
     }
 
     @Override
-    public Affinity affinity() {
-        return Affinity.RENDER;
+    public Lane lane() {
+        return Lane.RENDER;
     }
 
     @Override
-    public Set<ComponentId> dependencies(ExportSpec request, Set<ComponentId> selected) {
-        return ComponentId.selectedFrom(selected, ComponentId.DATA_GUIDE);
+    public Set<OutputKey<?>> inputs(NodeContext context) {
+        return ComponentOutputs.selectedInputs(context.selected(), ComponentKeys.DATA_GUIDE);
     }
 
     @Override
-    public ComponentOutcome execute(ExportSpec request, DumpLayout layout, ExecutionContext context)
-            throws IOException {
+    public ComponentResult execute(ExportSpec request, DumpLayout layout, ExecutionContext context) throws IOException {
         RunScope scope = context.scope();
         ModelsComponentConfig options = request.assets().models();
         ResourceDemand demand = EffectiveMods.demandFrom(options.fromComponents(), context);
@@ -66,29 +65,20 @@ public final class ModelComponent implements ExportTask {
                 demand.namespaces(),
                 request.assets().filter(),
                 options.filter());
-        GuideJsonCache guideCache = request.resolvedComponents().contains(ComponentId.DATA_GUIDE)
-                ? VerticalOutputs.require(context, ComponentId.DATA_GUIDE)
-                        .data()
-                        .extras()
-                        .guideCache()
+        GuideJsonCache guideCache = request.resolvedComponents().contains(ComponentKeys.DATA_GUIDE)
+                ? context.require(GuideChannels.JSON_CACHE)
                 : null;
         Set<String> owned = new LinkedHashSet<>();
-        List<ArtifactAddress> artifacts = new ArrayList<>();
         int modelsWritten = 0;
         boolean capable = false;
         String diagnostic = null;
         boolean any = false;
-        ArtifactAddressRenderer renderer = new ArtifactAddressRenderer(layout.root());
         for (ModelSource source : sources.available()) {
             any = true;
             ModelSnapshot capture = source.capture(new ModelCaptureRequest(scope, demand, effective, guideCache));
             owned.addAll(capture.ownedModIds());
             for (CapturedArtifact captured : capture.artifacts()) {
-                Path destination = renderer.render(captured.address());
-                scope.tasks().submit(() -> {
-                    DumpFiles.write(destination, captured.bytes());
-                });
-                artifacts.add(captured.address());
+                scope.tasks().submit(() -> layout.write(captured.address(), captured.bytes()));
             }
             modelsWritten += capture.modelsWritten();
             if (capture.capable()) {
@@ -99,22 +89,21 @@ public final class ModelComponent implements ExportTask {
             }
         }
         if (!any) {
-            return ComponentOutcome.builder(id())
-                    .status(ComponentOutcome.Status.SKIPPED)
+            return ComponentResult.builder(id())
+                    .status(ComponentResult.Status.SKIPPED)
                     .glb(false)
                     .diagnostic("platform does not export multiblock models")
                     .build();
         }
-        ComponentOutcomeBuilder b = ComponentOutcome.builder(id())
+        ComponentResultBuilder b = ComponentResult.builder(id())
                 .ownedModIds(owned)
-                .artifacts(artifacts)
                 .count("models", modelsWritten)
                 .glb(capable);
         if (diagnostic != null) {
             b.diagnostic(diagnostic);
         }
         if (!capable) {
-            b.status(ComponentOutcome.Status.SKIPPED);
+            b.status(ComponentResult.Status.SKIPPED);
         }
         return b.build();
     }

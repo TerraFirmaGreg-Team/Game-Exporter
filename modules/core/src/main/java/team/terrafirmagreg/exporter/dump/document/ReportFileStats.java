@@ -17,7 +17,6 @@ import lombok.experimental.UtilityClass;
 import team.terrafirmagreg.exporter.contract.dto.meta.LargestFile;
 import team.terrafirmagreg.exporter.contract.dto.meta.ReportFiles;
 import team.terrafirmagreg.exporter.contract.dto.meta.TypeFiles;
-import team.terrafirmagreg.exporter.dump.io.WrittenFiles;
 import team.terrafirmagreg.exporter.engine.run.RunTasks;
 import team.terrafirmagreg.exporter.util.HumanFormat;
 
@@ -37,12 +36,6 @@ public class ReportFileStats {
     }
 
     public static ReportFiles of(Path root, RunTasks tasks) throws IOException {
-        WrittenFiles tracker = WrittenFiles.forRoot(root);
-        if (tracker != null) {
-            Walk walk = new Walk();
-            tracker.snapshot().forEach(walk::add);
-            return walk.finish();
-        }
         if (tasks == null) {
             return of(root);
         }

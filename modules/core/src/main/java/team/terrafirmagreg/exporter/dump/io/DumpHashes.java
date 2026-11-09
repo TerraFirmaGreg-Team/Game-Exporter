@@ -42,13 +42,12 @@ public class DumpHashes {
     }
 
     public static String sha256Json(Object value) {
-        return sha256(DumpWriter.toCompactJsonBytes(canonicalJson(value)));
+        return sha256(DumpJson.toCompactJsonBytes(canonicalJson(value)));
     }
 
     static JsonNode canonicalJson(Object value) {
-        JsonNode node = value instanceof JsonNode json
-                ? json
-                : DumpWriter.compactMapper().valueToTree(value);
+        JsonNode node =
+                value instanceof JsonNode json ? json : DumpJson.compactMapper().valueToTree(value);
         return sortKeys(node);
     }
 
@@ -57,7 +56,7 @@ public class DumpHashes {
             return node;
         }
         if (node.isArray()) {
-            ArrayNode out = DumpWriter.compactMapper().createArrayNode();
+            ArrayNode out = DumpJson.compactMapper().createArrayNode();
             for (JsonNode el : node) {
                 out.add(sortKeys(el));
             }
@@ -77,7 +76,7 @@ public class DumpHashes {
             }
         }
         index.sort(Comparator.comparingLong(Long::parseUnsignedLong));
-        ObjectNode out = DumpWriter.compactMapper().createObjectNode();
+        ObjectNode out = DumpJson.compactMapper().createObjectNode();
         for (String key : index) {
             out.set(key, sortKeys(node.get(key)));
         }

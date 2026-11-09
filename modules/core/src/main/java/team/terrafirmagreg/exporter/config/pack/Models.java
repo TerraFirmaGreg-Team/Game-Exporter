@@ -28,7 +28,7 @@ public final class Models extends Filter {
                 includeMods.get(),
                 excludeMods.get(),
                 ComponentScope.parse(scope.get()),
-                ProfileNormalize.parseComponentIds(
+                ProfileNormalize.parseComponentKeys(
                         ProfileNormalize.normalizeFrom(fromComponents.get(), ModelsComponentConfig.DEFAULT_FROM)),
                 additionalMods.get());
     }

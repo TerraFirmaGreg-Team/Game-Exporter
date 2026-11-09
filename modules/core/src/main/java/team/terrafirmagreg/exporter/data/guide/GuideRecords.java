@@ -16,7 +16,7 @@ import team.terrafirmagreg.exporter.contract.ref.TaggedReference;
 import team.terrafirmagreg.exporter.contract.schema.DumpSchemas;
 import team.terrafirmagreg.exporter.contract.text.DumpText;
 import team.terrafirmagreg.exporter.contract.text.LangExtractor;
-import team.terrafirmagreg.exporter.data.icon.IconNormalize;
+import team.terrafirmagreg.exporter.data.stack.IconNormalize;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 

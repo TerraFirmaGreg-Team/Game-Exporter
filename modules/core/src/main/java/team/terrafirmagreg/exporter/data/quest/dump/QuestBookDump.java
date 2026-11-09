@@ -13,11 +13,11 @@ import team.terrafirmagreg.exporter.contract.dto.quest.QuestChapterSummary;
 import team.terrafirmagreg.exporter.contract.ref.TaggedReference;
 import team.terrafirmagreg.exporter.contract.schema.DumpSchemas;
 import team.terrafirmagreg.exporter.contract.text.LangExtractor;
-import team.terrafirmagreg.exporter.data.icon.IconNormalize;
 import team.terrafirmagreg.exporter.data.quest.QuestKeys;
-import team.terrafirmagreg.exporter.dump.io.DumpWriter;
+import team.terrafirmagreg.exporter.data.stack.IconNormalize;
+import team.terrafirmagreg.exporter.dump.io.DumpJson;
 import team.terrafirmagreg.exporter.util.JsonNodes;
-import team.terrafirmagreg.exporter.util.SnbtFiles;
+import team.terrafirmagreg.exporter.util.snbt.SnbtFiles;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -30,7 +30,7 @@ public class QuestBookDump {
             return SnbtFiles.parse(snbt);
         }
         if (Files.isRegularFile(json)) {
-            return DumpWriter.readTree(json);
+            return DumpJson.readTree(json);
         }
         return null;
     }
@@ -43,7 +43,7 @@ public class QuestBookDump {
             Map<String, QuestChapterSummary> chapters) {
         ObjectNode tree = raw instanceof ObjectNode node
                 ? (ObjectNode) raw.deepCopy()
-                : DumpWriter.mapper().createObjectNode();
+                : DumpJson.mapper().createObjectNode();
         TaggedReference icon = IconNormalize.tagged(tree.remove("icon"));
         String title = extractedTitle(tree, questLang, extractor, "quest." + questNamespace + ".book.title");
         Map<String, JsonNode> defaults = new LinkedHashMap<>();

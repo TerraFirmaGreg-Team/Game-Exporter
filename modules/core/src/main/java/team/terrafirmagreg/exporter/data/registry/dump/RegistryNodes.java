@@ -2,7 +2,7 @@ package team.terrafirmagreg.exporter.data.registry.dump;
 
 import java.util.Map;
 import lombok.experimental.UtilityClass;
-import team.terrafirmagreg.exporter.dump.io.DumpWriter;
+import team.terrafirmagreg.exporter.dump.io.DumpJson;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -14,7 +14,7 @@ class RegistryNodes {
             node.set(field, value);
             return;
         }
-        ObjectNode rebuilt = DumpWriter.mapper().getNodeFactory().objectNode();
+        ObjectNode rebuilt = DumpJson.mapper().getNodeFactory().objectNode();
         for (Map.Entry<String, JsonNode> property : node.properties()) {
             rebuilt.set(property.getKey(), property.getValue());
             if (property.getKey().equals(anchor)) {
@@ -26,6 +26,6 @@ class RegistryNodes {
     }
 
     static JsonNode stringNode(String value) {
-        return DumpWriter.mapper().getNodeFactory().stringNode(value);
+        return DumpJson.mapper().getNodeFactory().stringNode(value);
     }
 }

@@ -17,28 +17,30 @@ public class DumpImage {
         write(path, image, Mode.LOSSLESS);
     }
 
+    public static byte[] encode(BufferedImage image) throws IOException {
+        return encode(image, Mode.LOSSLESS);
+    }
+
+    public static byte[] encode(BufferedImage image, Mode mode) throws IOException {
+        if (mode == Mode.LOSSLESS) {
+            return WebPCodec.encodeLosslessImage(image);
+        }
+        return WebPCodec.encodeImage(image, CARD_QUALITY * 100f);
+    }
+
     public static void write(Path path, BufferedImage image, Mode mode) throws IOException {
         Path out = ensureWebp(path);
         Files.createDirectories(out.getParent());
-        byte[] bytes;
         try {
-            if (mode == Mode.LOSSLESS) {
-                bytes = WebPCodec.encodeLosslessImage(image);
-            } else {
-                bytes = WebPCodec.encodeImage(image, CARD_QUALITY * 100f);
-            }
-            Files.write(out, bytes);
-            WrittenFiles.record(out, bytes.length);
+            Files.write(out, encode(image, mode));
         } catch (IOException | RuntimeException e) {
             try {
                 Files.deleteIfExists(out);
-                WrittenFiles.discard(out);
             } catch (IOException suppressed) {
                 e.addSuppressed(suppressed);
             }
             throw e;
         }
-        ArtifactDigestCache.remember(out, new ArtifactDigest(bytes.length, DumpHashes.sha256(bytes)));
     }
 
     public static BufferedImage read(Path path) throws IOException {

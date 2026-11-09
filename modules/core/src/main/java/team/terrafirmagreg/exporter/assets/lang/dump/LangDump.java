@@ -19,11 +19,10 @@ import team.terrafirmagreg.exporter.assets.lang.LangAssembler;
 import team.terrafirmagreg.exporter.assets.lang.LangMerge;
 import team.terrafirmagreg.exporter.assets.lang.LangSnapshot;
 import team.terrafirmagreg.exporter.assets.lang.LangSource;
-import team.terrafirmagreg.exporter.contract.artifact.ArtifactAddress;
 import team.terrafirmagreg.exporter.contract.text.DisplayFill;
 import team.terrafirmagreg.exporter.contract.text.LangAdditions;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
-import team.terrafirmagreg.exporter.dump.io.DumpWriter;
+import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
 import team.terrafirmagreg.exporter.engine.run.RunTasks;
 import team.terrafirmagreg.exporter.engine.spec.options.ModIdFilter;
@@ -73,7 +72,6 @@ public class LangDump {
             ordered.add(0, "en_us");
         }
         int totalKeys = 0;
-        List<ArtifactAddress> artifacts = new ObjectArrayList<>();
         Map<String, String> keybinds = new Object2ObjectLinkedOpenHashMap<>();
         ObjectLinkedOpenHashSet<String> mods = new ObjectLinkedOpenHashSet<>();
         Map<String, Set<String>> namespaceLanguages = new TreeMap<>();
@@ -118,35 +116,26 @@ public class LangDump {
             }
         }
         for (Map.Entry<String, Map<String, String>> entry : mergedLangs.entrySet()) {
-            DumpWriter.writeJson(layout.lang(entry.getKey()), entry.getValue());
-            artifacts.add(new ArtifactAddress.Root("lang/" + entry.getKey()));
+            layout.writeJson(new ArtifactAddress.Root("lang/" + entry.getKey()), entry.getValue());
         }
-        artifacts.addAll(writeKeybinds(layout, keybinds));
+        writeKeybinds(layout, keybinds);
         Set<String> keybindNamespaces = new TreeSet<>();
         for (String key : keybinds.keySet()) {
             keybindNamespaces.add(keybindOwner(key, mods));
         }
-        return new LangWrite(
-                totalKeys,
-                List.copyOf(artifacts),
-                Set.copyOf(mods),
-                mergedLangs,
-                namespaceLanguages,
-                keybindNamespaces);
+        return new LangWrite(totalKeys, Set.copyOf(mods), mergedLangs, namespaceLanguages, keybindNamespaces);
     }
 
     public static int writeAssetLang(Path gameDir, Path assetsRoot, List<String> languages) throws IOException {
         return writeAssetLang(gameDir, assetsRoot, languages, List.of(), ModIdFilter.allowAll());
     }
 
-    public static List<ArtifactAddress> writeKeybinds(DumpLayout layout, Map<String, String> keybinds)
-            throws IOException {
+    public static void writeKeybinds(DumpLayout layout, Map<String, String> keybinds) throws IOException {
         Map<String, String> merged = KeybindsAssembler.assemble(keybinds);
         if (layout == null || merged.isEmpty()) {
-            return List.of();
+            return;
         }
-        DumpWriter.writeJson(layout.keybinds(), merged);
-        return List.of(new ArtifactAddress.Root("keybinds"));
+        layout.writeJson(new ArtifactAddress.Root("keybinds"), merged);
     }
 
     private static String keybindOwner(String name, Set<String> namespaces) {
@@ -172,29 +161,23 @@ public class LangDump {
 
     public record LangWrite(
             int keys,
-            List<ArtifactAddress> artifacts,
             Set<String> ownedModIds,
             Map<String, Map<String, String>> langs,
             Map<String, Set<String>> namespaceLanguages,
             Set<String> keybindNamespaces) {
         public LangWrite {
-            artifacts = artifacts == null ? List.of() : List.copyOf(artifacts);
             ownedModIds = ownedModIds == null ? Set.of() : Set.copyOf(ownedModIds);
             langs = langs == null ? Map.of() : LangAssembler.freezeLangs(langs);
             namespaceLanguages = namespaceLanguages == null ? Map.of() : freezeSets(namespaceLanguages);
             keybindNamespaces = keybindNamespaces == null ? Set.of() : Set.copyOf(keybindNamespaces);
         }
 
-        public LangWrite(int keys, List<ArtifactAddress> artifacts, Set<String> ownedModIds) {
-            this(keys, artifacts, ownedModIds, Map.of(), Map.of(), Set.of());
+        public LangWrite(int keys, Set<String> ownedModIds) {
+            this(keys, ownedModIds, Map.of(), Map.of(), Set.of());
         }
 
-        public LangWrite(
-                int keys,
-                List<ArtifactAddress> artifacts,
-                Set<String> ownedModIds,
-                Map<String, Map<String, String>> langs) {
-            this(keys, artifacts, ownedModIds, langs, Map.of(), Set.of());
+        public LangWrite(int keys, Set<String> ownedModIds, Map<String, Map<String, String>> langs) {
+            this(keys, ownedModIds, langs, Map.of(), Set.of());
         }
 
         private static Map<String, Set<String>> freezeSets(Map<String, Set<String>> value) {

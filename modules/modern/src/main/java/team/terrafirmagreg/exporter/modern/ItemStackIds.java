@@ -9,44 +9,55 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraftforge.registries.ForgeRegistries;
-import team.terrafirmagreg.exporter.contract.id.StackId;
+import team.terrafirmagreg.exporter.data.stack.ItemStackIdsBase;
 
 @UtilityClass
 public class ItemStackIds {
 
-    public static String of(ItemStack stack) {
-        if (stack == null || stack.isEmpty()) {
-            return null;
-        }
-        ResourceLocation loc = ForgeRegistries.ITEMS.getKey(stack.getItem());
-        if (loc == null) {
-            return null;
-        }
-        return StackId.format(loc.toString(), nbtString(stack.getTag()));
-    }
+    private static final ItemStackIdsBase<ItemStack> IDS = new ItemStackIdsBase<>() {
 
-    public static ItemStack toStack(String stackId) {
-        StackId.Parsed parsed = StackId.parse(stackId);
-        ResourceLocation loc = ResourceLocation.tryParse(parsed.registryId());
-        if (loc == null) {
-            throw new IllegalArgumentException("invalid item id: " + stackId);
+        @Override
+        protected boolean isEmpty(ItemStack stack) {
+            return stack.isEmpty();
         }
-        Item item = ForgeRegistries.ITEMS.getValue(loc);
-        if (item == null || item == Items.AIR) {
-            return ItemStack.EMPTY;
+
+        @Override
+        protected String registryIdOf(ItemStack stack) {
+            ResourceLocation loc = ForgeRegistries.ITEMS.getKey(stack.getItem());
+            return loc == null ? null : loc.toString();
         }
-        ItemStack stack = new ItemStack(item);
-        if (parsed.nbt() != null) {
+
+        @Override
+        protected String nbtText(ItemStack stack) {
+            CompoundTag tag = stack.getTag();
+            return tag == null || tag.isEmpty() ? null : tag.toString();
+        }
+
+        @Override
+        protected ItemStack resolveStack(String registryId, String stackId) {
+            ResourceLocation loc = ResourceLocation.tryParse(registryId);
+            if (loc == null) {
+                throw new IllegalArgumentException("invalid item id: " + stackId);
+            }
+            Item item = ForgeRegistries.ITEMS.getValue(loc);
+            return item == null || item == Items.AIR ? ItemStack.EMPTY : new ItemStack(item);
+        }
+
+        @Override
+        protected void attachNbt(ItemStack stack, String nbt, String stackId) {
             try {
-                stack.setTag(TagParser.parseTag(parsed.nbt()));
+                stack.setTag(TagParser.parseTag(nbt));
             } catch (CommandSyntaxException e) {
                 throw new IllegalArgumentException("invalid stack nbt: " + stackId, e);
             }
         }
-        return stack;
+    };
+
+    public static String of(ItemStack stack) {
+        return IDS.of(stack);
     }
 
-    private static String nbtString(CompoundTag tag) {
-        return tag == null || tag.isEmpty() ? null : tag.toString();
+    public static ItemStack toStack(String stackId) {
+        return IDS.toStack(stackId);
     }
 }

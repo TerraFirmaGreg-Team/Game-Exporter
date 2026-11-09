@@ -1,14 +1,11 @@
 package team.terrafirmagreg.exporter.data.registry.dump;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Stream;
 import lombok.experimental.UtilityClass;
 import team.terrafirmagreg.exporter.contract.dto.atlas.AtlasDocument;
 import team.terrafirmagreg.exporter.contract.dto.atlas.AtlasEntry;
@@ -16,10 +13,7 @@ import team.terrafirmagreg.exporter.contract.dto.atlas.AtlasPage;
 import team.terrafirmagreg.exporter.contract.dto.entry.SpriteEntry;
 import team.terrafirmagreg.exporter.contract.id.EntryKind;
 import team.terrafirmagreg.exporter.contract.ref.TaggedReference;
-import team.terrafirmagreg.exporter.dump.AssetPaths;
-import team.terrafirmagreg.exporter.dump.DumpLayout;
-import team.terrafirmagreg.exporter.dump.io.DumpWriter;
-import team.terrafirmagreg.exporter.dump.io.WrittenFiles;
+import team.terrafirmagreg.exporter.dump.io.DumpJson;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
 import team.terrafirmagreg.exporter.engine.run.RunTasks;
 import team.terrafirmagreg.exporter.util.ExportLog;
@@ -32,41 +26,12 @@ class SpriteLinker {
 
     private static final int MIN_PARALLEL_ENTRIES = 256;
 
-    static SpriteScan scan(DumpLayout layout, RunScope scope) throws IOException {
-        Path assets = layout.assets();
-        if (!Files.isDirectory(assets)) {
-            return new SpriteScan(Map.of(), List.of());
-        }
-        List<Path> atlasFiles = new ArrayList<>();
-        try (Stream<Path> mods = Files.list(assets)) {
-            for (Path modDir : mods.filter(Files::isDirectory).sorted().toList()) {
-                Path atlases = modDir.resolve(AssetPaths.ATLASES);
-                if (!Files.isDirectory(atlases)) {
-                    continue;
-                }
-                try (Stream<Path> files = Files.list(atlases)) {
-                    files.filter(p -> p.getFileName().toString().endsWith(".json"))
-                            .sorted()
-                            .forEach(atlasFiles::add);
-                }
-            }
-        }
-        List<CompletableFuture<Map<String, List<Placed>>>> parsed = new ArrayList<>();
-        for (Path file : atlasFiles) {
-            parsed.add(scope.tasks().supply(() -> {
-                Map<String, List<Placed>> byFolder = new LinkedHashMap<>();
-                collect(DumpWriter.readValue(file, AtlasDocument.class), byFolder);
-                return byFolder;
-            }));
-        }
+    static SpriteScan scan(List<AtlasDocument> placements) {
         Map<String, List<Placed>> byFolder = new LinkedHashMap<>();
-        for (CompletableFuture<Map<String, List<Placed>>> future : parsed) {
-            for (Map.Entry<String, List<Placed>> entry : RunTasks.await(future).entrySet()) {
-                byFolder.computeIfAbsent(entry.getKey(), ignored -> new ArrayList<>())
-                        .addAll(entry.getValue());
-            }
+        for (AtlasDocument document : placements) {
+            collect(document, byFolder);
         }
-        return new SpriteScan(byFolder, atlasFiles);
+        return new SpriteScan(byFolder);
     }
 
     static void patchSprites(ObjectNode root, List<Placed> sprites, RunScope scope) throws IOException {
@@ -100,25 +65,6 @@ class SpriteLinker {
         }
         for (CompletableFuture<?> future : pending) {
             RunTasks.await(future);
-        }
-    }
-
-    static void cleanup(DumpLayout layout, List<Path> atlasFiles) throws IOException {
-        for (Path file : atlasFiles) {
-            Files.delete(file);
-            WrittenFiles.discard(file);
-        }
-        Path assets = layout.assets();
-        if (!Files.isDirectory(assets)) {
-            return;
-        }
-        try (Stream<Path> mods = Files.list(assets)) {
-            for (Path modDir : mods.filter(Files::isDirectory).toList()) {
-                Path atlases = modDir.resolve(AssetPaths.ATLASES);
-                if (Files.isDirectory(atlases) && isEmpty(atlases)) {
-                    Files.delete(atlases);
-                }
-            }
         }
     }
 
@@ -169,16 +115,10 @@ class SpriteLinker {
     }
 
     private static ObjectNode spriteNode(SpriteEntry sprite) {
-        return DumpWriter.mapper().valueToTree(sprite);
+        return DumpJson.mapper().valueToTree(sprite);
     }
 
-    private static boolean isEmpty(Path dir) throws IOException {
-        try (Stream<Path> files = Files.list(dir)) {
-            return files.findAny().isEmpty();
-        }
-    }
-
-    record SpriteScan(Map<String, List<Placed>> byFolder, List<Path> atlasFiles) {}
+    record SpriteScan(Map<String, List<Placed>> byFolder) {}
 
     record Placed(String id, JsonNode tag, SpriteEntry sprite) {}
 }

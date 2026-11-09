@@ -2,6 +2,7 @@ package team.terrafirmagreg.exporter.data.category;
 
 import java.io.IOException;
 import java.util.*;
+import team.terrafirmagreg.exporter.assets.lang.LangChannels;
 import team.terrafirmagreg.exporter.contract.dto.recipe.RecipeCategory;
 import team.terrafirmagreg.exporter.contract.dto.recipe.RecipeCategoryLayout;
 import team.terrafirmagreg.exporter.contract.id.ResourceId;
@@ -10,20 +11,24 @@ import team.terrafirmagreg.exporter.contract.text.DisplayFill;
 import team.terrafirmagreg.exporter.data.recipe.RecipeSnapshot;
 import team.terrafirmagreg.exporter.data.recipe.RecipeSource;
 import team.terrafirmagreg.exporter.data.recipe.RecipeStageKeys;
+import team.terrafirmagreg.exporter.data.registry.RegistryChannels;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
-import team.terrafirmagreg.exporter.engine.output.ComponentOutcome;
-import team.terrafirmagreg.exporter.engine.output.ComponentOutcomeBuilder;
-import team.terrafirmagreg.exporter.engine.output.LinkPayload;
-import team.terrafirmagreg.exporter.engine.pipeline.ExportTask;
-import team.terrafirmagreg.exporter.engine.plan.ExecutionContext;
+import team.terrafirmagreg.exporter.engine.graph.ExportComponent;
+import team.terrafirmagreg.exporter.engine.graph.NodeContext;
+import team.terrafirmagreg.exporter.engine.graph.OutputKey;
+import team.terrafirmagreg.exporter.engine.report.ComponentOutputs;
+import team.terrafirmagreg.exporter.engine.report.ComponentResult;
+import team.terrafirmagreg.exporter.engine.report.ComponentResultBuilder;
+import team.terrafirmagreg.exporter.engine.run.ExecutionContext;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
-import team.terrafirmagreg.exporter.engine.spec.ComponentId;
+import team.terrafirmagreg.exporter.engine.spec.ComponentKey;
+import team.terrafirmagreg.exporter.engine.spec.ComponentKeys;
 import team.terrafirmagreg.exporter.engine.spec.ExportSpec;
 import team.terrafirmagreg.exporter.engine.spec.options.ModIdFilter;
 import team.terrafirmagreg.exporter.spi.MergePolicy;
 import team.terrafirmagreg.exporter.spi.SourceSet;
 
-public final class CategoryComponent implements ExportTask {
+public final class CategoryComponent implements ExportComponent {
     private final SourceSet<CategorySource> sources = new SourceSet<>("recipe categories", MergePolicy.FIRST_AVAILABLE);
     private final SourceSet<RecipeSource> recipeSources = new SourceSet<>("recipe layout", MergePolicy.ORDERED_OVERLAY);
 
@@ -38,8 +43,8 @@ public final class CategoryComponent implements ExportTask {
     }
 
     @Override
-    public ComponentId id() {
-        return ComponentId.DATA_RECIPE_CATEGORIES;
+    public ComponentKey id() {
+        return ComponentKeys.DATA_RECIPE_CATEGORIES;
     }
 
     @Override
@@ -48,13 +53,12 @@ public final class CategoryComponent implements ExportTask {
     }
 
     @Override
-    public Set<ComponentId> dependencies(ExportSpec request, Set<ComponentId> selected) {
-        return ComponentId.selectedFrom(selected, ComponentId.DATA_RECIPES);
+    public Set<OutputKey<?>> inputs(NodeContext context) {
+        return ComponentOutputs.selectedInputs(context.selected(), ComponentKeys.DATA_RECIPES);
     }
 
     @Override
-    public ComponentOutcome execute(ExportSpec request, DumpLayout layout, ExecutionContext context)
-            throws IOException {
+    public ComponentResult execute(ExportSpec request, DumpLayout layout, ExecutionContext context) throws IOException {
         RunScope scope = context.scope();
         ModIdFilter filter = request.filterFor(id());
         Map<String, RecipeCategory> categories = new LinkedHashMap<>();
@@ -87,7 +91,7 @@ public final class CategoryComponent implements ExportTask {
         categories = new LinkedHashMap<>(filter.filterByKeyNamespace(categories));
         Map<String, RecipeCategory> written = new LinkedHashMap<>();
         int invalidIds = 0;
-        ComponentOutcomeBuilder result = ComponentOutcome.builder(id());
+        ComponentResultBuilder result = ComponentResult.builder(id());
         for (String diagnostic : diagnostics) {
             result.diagnostic(diagnostic);
         }
@@ -110,9 +114,11 @@ public final class CategoryComponent implements ExportTask {
         }
         result.ownedModIds(ResourceId.namespacesOf(written.keySet()))
                 .resourceDemand(CategorySnapshot.demandOf(written))
-                .displayFills(fills)
-                .count("categories", written.size())
-                .payload(LinkPayload.builder().categories(written.values()).build());
+                .count("categories", written.size());
+        context.contribute(RegistryChannels.CATEGORIES, List.copyOf(written.values()));
+        if (!fills.isEmpty()) {
+            context.contribute(LangChannels.DISPLAY_FILLS, Map.of(id(), List.copyOf(fills)));
+        }
         if (invalidIds > 0) {
             result.diagnostic("Skipped " + invalidIds + " recipe categories with invalid ids");
         }

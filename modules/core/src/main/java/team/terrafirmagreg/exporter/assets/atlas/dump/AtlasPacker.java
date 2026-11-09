@@ -12,11 +12,10 @@ import lombok.experimental.UtilityClass;
 import team.terrafirmagreg.exporter.assets.atlas.capture.Atlas;
 import team.terrafirmagreg.exporter.assets.atlas.capture.AtlasSprite;
 import team.terrafirmagreg.exporter.assets.atlas.dump.AtlasSectionPacker.PackedSection;
+import team.terrafirmagreg.exporter.contract.dto.atlas.AtlasDocument;
 import team.terrafirmagreg.exporter.contract.id.EntryKind;
 import team.terrafirmagreg.exporter.contract.id.ResourceId;
-import team.terrafirmagreg.exporter.dump.AssetPaths;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
-import team.terrafirmagreg.exporter.dump.io.DumpWriter;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
 import team.terrafirmagreg.exporter.util.ExportLog;
 
@@ -57,16 +56,25 @@ public class AtlasPacker {
         }
         scope.tasks().drain(packs);
         List<Path> files = new ObjectArrayList<>();
+        List<AtlasDocument> placements = new ObjectArrayList<>();
         ObjectLinkedOpenHashSet<String> itemKeys = new ObjectLinkedOpenHashSet<>();
         ObjectLinkedOpenHashSet<String> blockKeys = new ObjectLinkedOpenHashSet<>();
         for (Map.Entry<String, List<AtlasSprite>> e : byMod.entrySet()) {
             Write write = packed.get(e.getKey());
             files.addAll(write.files());
             collectSpriteKeys(write.atlas(), itemKeys, blockKeys);
+            placements.add(AtlasSheetWrite.document(
+                    e.getKey(), EntryKind.ITEM, write.atlas().items()));
+            if (write.atlas().blocks() != null
+                    && !write.atlas().blocks().sprites().isEmpty()) {
+                placements.add(AtlasSheetWrite.document(
+                        e.getKey(), EntryKind.BLOCK, write.atlas().blocks()));
+            }
             ExportLog.debug("atlas {} : {} sprites", e.getKey(), e.getValue().size());
         }
         ExportLog.info("atlas pack mods={} files={}", byMod.size(), files.size());
-        return new ItemSpritesWrite(List.copyOf(files), Set.copyOf(itemKeys), Set.copyOf(blockKeys));
+        return new ItemSpritesWrite(
+                List.copyOf(files), Set.copyOf(itemKeys), Set.copyOf(blockKeys), List.copyOf(placements));
     }
 
     static Map<String, List<AtlasSprite>> itemSpriteMods(List<AtlasSprite> sprites) {
@@ -111,30 +119,24 @@ public class AtlasPacker {
             files.addAll(AtlasSheetWrite.writeSheets(layout, modId, EntryKind.BLOCK, blocks));
         }
         Atlas atlas = new Atlas(modId, items.section(), blocks.section());
-        Path itemAtlas = AssetPaths.atlasFile(layout, modId, EntryKind.ITEM);
-        DumpWriter.writeJson(itemAtlas, AtlasSheetWrite.document(modId, EntryKind.ITEM, items.section()));
-        files.add(itemAtlas);
-        if (!blockSprites.isEmpty()) {
-            Path blockAtlas = AssetPaths.atlasFile(layout, modId, EntryKind.BLOCK);
-            DumpWriter.writeJson(blockAtlas, AtlasSheetWrite.document(modId, EntryKind.BLOCK, blocks.section()));
-            files.add(blockAtlas);
-        }
         return new Write(atlas, List.copyOf(files));
     }
 
     public record Write(Atlas atlas, List<Path> files) {}
 
-    public record ItemSpritesWrite(List<Path> files, Set<String> itemSpriteKeys, Set<String> blockSpriteKeys) {
+    public record ItemSpritesWrite(
+            List<Path> files, Set<String> itemSpriteKeys, Set<String> blockSpriteKeys, List<AtlasDocument> placements) {
         public ItemSpritesWrite {
             files = files == null ? List.of() : List.copyOf(files);
             itemSpriteKeys =
                     itemSpriteKeys == null ? Set.of() : Set.copyOf(new ObjectLinkedOpenHashSet<>(itemSpriteKeys));
             blockSpriteKeys =
                     blockSpriteKeys == null ? Set.of() : Set.copyOf(new ObjectLinkedOpenHashSet<>(blockSpriteKeys));
+            placements = placements == null ? List.of() : List.copyOf(placements);
         }
 
         public static ItemSpritesWrite empty() {
-            return new ItemSpritesWrite(List.of(), Set.of(), Set.of());
+            return new ItemSpritesWrite(List.of(), Set.of(), Set.of(), List.of());
         }
     }
 }

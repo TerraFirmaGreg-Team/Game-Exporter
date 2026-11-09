@@ -4,7 +4,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.experimental.UtilityClass;
-import team.terrafirmagreg.exporter.dump.io.DumpWriter;
+import team.terrafirmagreg.exporter.dump.io.DumpJson;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -30,7 +30,7 @@ public class EdgeTable {
                 if (!(list instanceof ArrayNode array)) {
                     continue;
                 }
-                ArrayNode indexes = DumpWriter.mapper().createArrayNode();
+                ArrayNode indexes = DumpJson.mapper().createArrayNode();
                 boolean interned = false;
                 for (JsonNode ref : array) {
                     if (!ref.isString()) {
@@ -46,7 +46,7 @@ public class EdgeTable {
             }
         }
         if (!ids.isEmpty()) {
-            ArrayNode table = DumpWriter.mapper().createArrayNode();
+            ArrayNode table = DumpJson.mapper().createArrayNode();
             for (String id : ids.keySet()) {
                 table.add(id);
             }

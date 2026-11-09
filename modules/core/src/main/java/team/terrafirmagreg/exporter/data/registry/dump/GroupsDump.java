@@ -7,16 +7,15 @@ import lombok.experimental.UtilityClass;
 import team.terrafirmagreg.exporter.contract.dto.group.StackGroup;
 import team.terrafirmagreg.exporter.contract.dto.group.StackGroupValue;
 import team.terrafirmagreg.exporter.contract.id.ResourceId;
-import team.terrafirmagreg.exporter.engine.output.LinkPayload;
 
 @UtilityClass
 public class GroupsDump {
-    public static Map<String, Map<String, StackGroupValue>> byNamespace(LinkPayload payload) {
+    public static Map<String, Map<String, StackGroupValue>> byNamespace(Map<String, List<StackGroup>> groupsByKind) {
         Map<String, Map<String, StackGroupValue>> byNs = new TreeMap<>();
-        if (payload == null) {
+        if (groupsByKind == null) {
             return byNs;
         }
-        for (List<StackGroup> rows : payload.stackGroupsByKind().values()) {
+        for (List<StackGroup> rows : groupsByKind.values()) {
             if (rows == null) {
                 continue;
             }

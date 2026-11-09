@@ -1,8 +1,9 @@
 package team.terrafirmagreg.exporter.config.pack;
 
-import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.List;
-import team.terrafirmagreg.exporter.engine.spec.ComponentId;
+import team.terrafirmagreg.exporter.engine.spec.ComponentKey;
+import team.terrafirmagreg.exporter.engine.spec.ComponentKeys;
 import team.terrafirmagreg.exporter.engine.spec.options.ComponentOptions;
 import team.terrafirmagreg.exporter.engine.spec.options.ModIdFilter;
 import team.terrafirmagreg.exporter.engine.spec.options.ProductOptions;
@@ -30,10 +31,10 @@ public final class Assets {
     }
 
     public ProductOptions toOptions() {
-        EnumMap<ComponentId, ComponentOptions> map = new EnumMap<>(ComponentId.class);
-        map.put(ComponentId.ASSETS_LANG, lang.toOptions());
-        map.put(ComponentId.ASSETS_TEXTURES, textures.toOptions());
-        map.put(ComponentId.ASSETS_MODELS, models.toOptions());
+        LinkedHashMap<ComponentKey, ComponentOptions> map = new LinkedHashMap<>();
+        map.put(ComponentKeys.ASSETS_LANG, lang.toOptions());
+        map.put(ComponentKeys.ASSETS_TEXTURES, textures.toOptions());
+        map.put(ComponentKeys.ASSETS_MODELS, models.toOptions());
         return new ProductOptions(modFilter(), map);
     }
 }

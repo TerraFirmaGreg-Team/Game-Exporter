@@ -13,7 +13,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import lombok.experimental.UtilityClass;
 import team.terrafirmagreg.exporter.contract.text.LangExtractor;
-import team.terrafirmagreg.exporter.vintage.pack.PackFiles;
+import team.terrafirmagreg.exporter.util.PackFiles;
 
 @UtilityClass
 public class LangIndex {

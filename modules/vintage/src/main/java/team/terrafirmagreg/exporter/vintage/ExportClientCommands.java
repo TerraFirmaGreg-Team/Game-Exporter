@@ -9,16 +9,16 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraftforge.client.ClientCommandHandler;
 import team.terrafirmagreg.exporter.engine.live.CommandReply;
-import team.terrafirmagreg.exporter.engine.live.LiveExportWiringBase;
+import team.terrafirmagreg.exporter.engine.live.LiveExport;
 
 public final class ExportClientCommands extends CommandBase {
-    private final LiveExportWiringBase<?> dump;
+    private final LiveExport<?> dump;
 
-    private ExportClientCommands(LiveExportWiringBase<?> dump) {
+    private ExportClientCommands(LiveExport<?> dump) {
         this.dump = dump;
     }
 
-    public static void register(LiveExportWiringBase<?> dump) {
+    public static void register(LiveExport<?> dump) {
         ClientCommandHandler.instance.registerCommand(new ExportClientCommands(dump));
     }
 

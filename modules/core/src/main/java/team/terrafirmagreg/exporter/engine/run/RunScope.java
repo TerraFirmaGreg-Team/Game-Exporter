@@ -1,7 +1,7 @@
 package team.terrafirmagreg.exporter.engine.run;
 
 import java.util.concurrent.atomic.AtomicBoolean;
-import team.terrafirmagreg.exporter.util.RunMetrics;
+import team.terrafirmagreg.exporter.engine.report.RunMetrics;
 
 public final class RunScope implements AutoCloseable {
     private final CancellationToken cancellation = new CancellationToken();

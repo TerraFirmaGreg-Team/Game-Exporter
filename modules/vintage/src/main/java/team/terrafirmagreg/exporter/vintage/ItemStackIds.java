@@ -7,48 +7,64 @@ import net.minecraft.nbt.JsonToNBT;
 import net.minecraft.nbt.NBTException;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ResourceLocation;
-import team.terrafirmagreg.exporter.contract.id.StackId;
+import team.terrafirmagreg.exporter.data.stack.ItemStackIdsBase;
 
 @UtilityClass
 public class ItemStackIds {
 
-    public static String of(ItemStack stack) {
-        if (stack == null || stack.isEmpty()) {
-            return null;
-        }
-        Item item = stack.getItem();
-        if (item == null) {
-            return null;
-        }
-        ResourceLocation name = item.getRegistryName();
-        if (name == null) {
-            return null;
-        }
-        NBTTagCompound tag = stack.getTagCompound();
-        String nbt = tag == null || tag.isEmpty() ? null : tag.toString();
-        return StackId.format(name.toString(), nbt);
-    }
+    private static final ItemStackIdsBase<ItemStack> IDS = new ItemStackIdsBase<>() {
 
-    public static ItemStack toStack(String stackId) {
-        StackId.Parsed parsed = StackId.parse(stackId);
-        ResourceLocation loc;
-        try {
-            loc = new ResourceLocation(parsed.registryId());
-        } catch (Exception e) {
-            throw new IllegalArgumentException("invalid item id: " + stackId, e);
+        @Override
+        protected boolean isEmpty(ItemStack stack) {
+            return stack.isEmpty();
         }
-        Item item = Item.REGISTRY.getObject(loc);
-        if (item == null || item == Item.getItemById(0)) {
-            throw new IllegalArgumentException("unknown item: " + stackId);
+
+        @Override
+        protected String registryIdOf(ItemStack stack) {
+            Item item = stack.getItem();
+            if (item == null) {
+                return null;
+            }
+            ResourceLocation name = item.getRegistryName();
+            return name == null ? null : name.toString();
         }
-        ItemStack stack = new ItemStack(item);
-        if (parsed.nbt() != null) {
+
+        @Override
+        protected String nbtText(ItemStack stack) {
+            NBTTagCompound tag = stack.getTagCompound();
+            return tag == null || tag.isEmpty() ? null : tag.toString();
+        }
+
+        @Override
+        protected ItemStack resolveStack(String registryId, String stackId) {
+            ResourceLocation loc;
             try {
-                stack.setTagCompound(JsonToNBT.getTagFromJson(parsed.nbt()));
+                loc = new ResourceLocation(registryId);
+            } catch (Exception e) {
+                throw new IllegalArgumentException("invalid item id: " + stackId, e);
+            }
+            Item item = Item.REGISTRY.getObject(loc);
+            if (item == null || item == Item.getItemById(0)) {
+                return ItemStack.EMPTY;
+            }
+            return new ItemStack(item);
+        }
+
+        @Override
+        protected void attachNbt(ItemStack stack, String nbt, String stackId) {
+            try {
+                stack.setTagCompound(JsonToNBT.getTagFromJson(nbt));
             } catch (NBTException e) {
                 throw new IllegalArgumentException("invalid stack nbt: " + stackId, e);
             }
         }
-        return stack;
+    };
+
+    public static String of(ItemStack stack) {
+        return IDS.of(stack);
+    }
+
+    public static ItemStack toStack(String stackId) {
+        return IDS.toStack(stackId);
     }
 }

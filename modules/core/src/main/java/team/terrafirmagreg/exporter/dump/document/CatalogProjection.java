@@ -1,10 +1,10 @@
 package team.terrafirmagreg.exporter.dump.document;
 
 import java.util.*;
-import team.terrafirmagreg.exporter.contract.artifact.ArtifactAddress;
-import team.terrafirmagreg.exporter.contract.artifact.ArtifactCatalog;
-import team.terrafirmagreg.exporter.contract.artifact.ArtifactDescriptor;
 import team.terrafirmagreg.exporter.contract.id.ResourceId;
+import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
+import team.terrafirmagreg.exporter.dump.artifact.ArtifactCatalog;
+import team.terrafirmagreg.exporter.dump.artifact.ArtifactDescriptor;
 
 public final class CatalogProjection {
     private final NavigableMap<String, MutableNamespace> namespaces = new TreeMap<>();

@@ -3,7 +3,7 @@ package team.terrafirmagreg.exporter.contract.ref;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.Objects;
 import team.terrafirmagreg.exporter.contract.id.ResourceId;
-import team.terrafirmagreg.exporter.util.SnbtToJson;
+import team.terrafirmagreg.exporter.util.snbt.SnbtToJson;
 import tools.jackson.databind.JsonNode;
 
 public record StackIdentity(

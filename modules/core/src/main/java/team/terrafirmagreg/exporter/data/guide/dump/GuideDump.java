@@ -1,7 +1,6 @@
 package team.terrafirmagreg.exporter.data.guide.dump;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -14,27 +13,24 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import lombok.experimental.UtilityClass;
-import team.terrafirmagreg.exporter.contract.artifact.ArtifactAddress;
 import team.terrafirmagreg.exporter.contract.text.LangAdditions;
 import team.terrafirmagreg.exporter.contract.text.LangExtractor;
 import team.terrafirmagreg.exporter.data.guide.GuideNormalize;
 import team.terrafirmagreg.exporter.data.guide.GuideSnapshot;
 import team.terrafirmagreg.exporter.data.guide.GuideSnapshot.GuideBook;
-import team.terrafirmagreg.exporter.dump.DataPaths;
-import team.terrafirmagreg.exporter.dump.DumpFiles;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
 import team.terrafirmagreg.exporter.dump.DumpPaths;
+import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
 import team.terrafirmagreg.exporter.engine.demand.ResourceDemand;
-import team.terrafirmagreg.exporter.engine.pipeline.WriteResult;
+import team.terrafirmagreg.exporter.engine.report.RunMetrics;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
 import team.terrafirmagreg.exporter.engine.run.RunTasks;
 import team.terrafirmagreg.exporter.util.ExportLog;
-import team.terrafirmagreg.exporter.util.RunMetrics;
 
 @UtilityClass
 public class GuideDump {
 
-    public static WriteResult writeSnapshot(
+    public static ResourceDemand writeSnapshot(
             DumpLayout layout,
             GuideSnapshot snapshot,
             List<String> languages,
@@ -46,7 +42,6 @@ public class GuideDump {
         RunMetrics.Stopwatch total = metrics.start("total");
         ResourceDemand.Builder demand = ResourceDemand.builder();
         List<Future<?>> writes = new ArrayList<>();
-        List<ArtifactAddress> artifacts = new ArrayList<>();
         demand.merge(snapshot.demand());
         AtomicLong langKeysNs = new AtomicLong();
         ConcurrentMap<String, Set<String>> keyCache = new ConcurrentHashMap<>();
@@ -68,8 +63,8 @@ public class GuideDump {
         for (GuideBook book : snapshot.books()) {
             pending.add(scope.tasks().supply(() -> {
                 LangExtractor extractor = new LangExtractor(sharedKeys);
-                Map<String, byte[]> files =
-                        GuideNormalize.shapeBook(book.namespace(), book.bookPath(), book.files(), extractor, languages);
+                Map<String, byte[]> files = GuideNormalize.shapeBook(
+                        book.namespace(), book.bookPath(), book.files(), extractor, languages, layout.writer());
                 return new BookShape(book, extractor, files);
             }));
         }
@@ -79,10 +74,9 @@ public class GuideDump {
             if (extras != null) {
                 extras.putAll(book.namespace(), shaped.extractor().generated());
             }
-            Path bookRoot = DataPaths.guideRoot(layout, book.namespace(), book.bookPath());
-            enqueueBookArtifacts(book.namespace(), book.bookPath(), shaped.files(), artifacts);
             Map<String, byte[]> files = shaped.files();
-            writes.add(scope.tasks().submit(() -> writeBookFilesSync(bookRoot, files)));
+            writes.add(
+                    scope.tasks().submit(() -> writeBookFilesSync(layout, book.namespace(), book.bookPath(), files)));
         }
         shape.stop();
         RunMetrics.Stopwatch ioDrain = metrics.start("ioDrain");
@@ -101,25 +95,18 @@ public class GuideDump {
                 metrics.timings().get("shape"),
                 metrics.timings().get("ioDrain"),
                 TimeUnit.NANOSECONDS.toMillis(langKeysNs.get()));
-        return new WriteResult(result, List.copyOf(artifacts));
+        return result;
     }
 
     private record BookShape(GuideBook book, LangExtractor extractor, Map<String, byte[]> files) {}
 
-    private static void writeBookFilesSync(Path bookRoot, Map<String, byte[]> files) throws IOException {
+    private static void writeBookFilesSync(
+            DumpLayout layout, String namespace, String bookPath, Map<String, byte[]> files) throws IOException {
         for (Map.Entry<String, byte[]> file : files.entrySet()) {
             String relative = DumpPaths.requireResourcePath(file.getKey().replace('\\', '/'));
-            Path target = DumpPaths.resolveUnder(bookRoot, relative);
-            DumpFiles.write(target, file.getValue());
-        }
-    }
-
-    private static void enqueueBookArtifacts(
-            String namespace, String bookPath, Map<String, byte[]> files, List<ArtifactAddress> artifacts) {
-        for (Map.Entry<String, byte[]> file : files.entrySet()) {
-            String relative = DumpPaths.requireResourcePath(file.getKey().replace('\\', '/'));
-            artifacts.add(
-                    new ArtifactAddress.Data(namespace, bookPath + "/" + relative, ArtifactAddress.DataKind.GUIDE));
+            layout.write(
+                    new ArtifactAddress.Data(namespace, bookPath + "/" + relative, ArtifactAddress.DataKind.GUIDE),
+                    file.getValue());
         }
     }
 }

@@ -10,7 +10,6 @@ import team.terrafirmagreg.exporter.dump.io.DumpImage;
 public class AssetPaths {
     public static final String ASSETS = "assets";
     public static final String TEXTURES = "textures";
-    public static final String ATLASES = "atlases";
     public static final String MODELS = "models";
     public static final String MULTIBLOCK = "multiblock";
     public static final String INLINE = "inline";
@@ -24,10 +23,6 @@ public class AssetPaths {
 
     public static Path assets(DumpLayout layout, String modId) {
         return assets(layout).resolve(DumpPaths.requireModId(modId));
-    }
-
-    public static Path atlasFile(DumpLayout layout, String modId, EntryKind kind) {
-        return assets(layout, modId).resolve(ATLASES).resolve(atlasSection(kind) + ".json");
     }
 
     public static Path atlasPage(DumpLayout layout, String modId, EntryKind section, int page) {
@@ -120,10 +115,6 @@ public class AssetPaths {
 
     private static Path textures(DumpLayout layout, String modId) {
         return assets(layout, modId).resolve(TEXTURES);
-    }
-
-    private static String atlasSection(EntryKind kind) {
-        return kind == EntryKind.BLOCK ? BLOCKS : ITEMS;
     }
 
     private static String plural(EntryKind section) {

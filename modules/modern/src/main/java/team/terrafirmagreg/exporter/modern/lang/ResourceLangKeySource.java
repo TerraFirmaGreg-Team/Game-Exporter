@@ -18,7 +18,7 @@ import net.minecraft.server.packs.resources.ResourceManager;
 import team.terrafirmagreg.exporter.assets.lang.LangMerge;
 import team.terrafirmagreg.exporter.assets.lang.LangNamespace;
 import team.terrafirmagreg.exporter.assets.lang.LangScanKey;
-import team.terrafirmagreg.exporter.dump.io.DumpWriter;
+import team.terrafirmagreg.exporter.dump.io.DumpJson;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
 import team.terrafirmagreg.exporter.util.ExportLog;
 import tools.jackson.databind.JsonNode;
@@ -93,7 +93,7 @@ public class ResourceLangKeySource {
         int files = 0;
         for (Resource layer : layers) {
             try (BufferedReader reader = layer.openAsReader()) {
-                JsonNode element = DumpWriter.readGameTree(reader);
+                JsonNode element = DumpJson.readGameTree(reader);
                 if (element != null && element.isObject()) {
                     LangMerge.mergeJsonObject(into, (ObjectNode) element);
                 }

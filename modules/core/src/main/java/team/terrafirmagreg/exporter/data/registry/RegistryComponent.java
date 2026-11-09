@@ -4,6 +4,7 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.io.IOException;
 import java.util.*;
+import team.terrafirmagreg.exporter.assets.lang.LangChannels;
 import team.terrafirmagreg.exporter.contract.dto.entry.*;
 import team.terrafirmagreg.exporter.contract.dto.group.StackGroup;
 import team.terrafirmagreg.exporter.contract.dto.tag.TagEntry;
@@ -20,24 +21,26 @@ import team.terrafirmagreg.exporter.data.stack.capture.ItemStackEntry;
 import team.terrafirmagreg.exporter.data.stack.capture.StackEntry;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
 import team.terrafirmagreg.exporter.engine.demand.ResourceDemand;
-import team.terrafirmagreg.exporter.engine.output.ComponentOutcome;
-import team.terrafirmagreg.exporter.engine.output.ComponentOutcomeBuilder;
-import team.terrafirmagreg.exporter.engine.output.LinkPayload;
-import team.terrafirmagreg.exporter.engine.output.LinkPayloadBuilder;
-import team.terrafirmagreg.exporter.engine.output.VerticalOutputs;
-import team.terrafirmagreg.exporter.engine.pipeline.ExportTask;
-import team.terrafirmagreg.exporter.engine.plan.ExecutionContext;
+import team.terrafirmagreg.exporter.engine.graph.ExportComponent;
+import team.terrafirmagreg.exporter.engine.graph.NodeContext;
+import team.terrafirmagreg.exporter.engine.graph.OutputKey;
+import team.terrafirmagreg.exporter.engine.report.ComponentOutputs;
+import team.terrafirmagreg.exporter.engine.report.ComponentResult;
+import team.terrafirmagreg.exporter.engine.report.ComponentResultBuilder;
+import team.terrafirmagreg.exporter.engine.run.ExecutionContext;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
-import team.terrafirmagreg.exporter.engine.spec.ComponentId;
+import team.terrafirmagreg.exporter.engine.spec.ComponentCatalog;
+import team.terrafirmagreg.exporter.engine.spec.ComponentKey;
+import team.terrafirmagreg.exporter.engine.spec.ComponentKeys;
 import team.terrafirmagreg.exporter.engine.spec.EffectiveMods;
 import team.terrafirmagreg.exporter.engine.spec.ExportSpec;
 import team.terrafirmagreg.exporter.engine.spec.options.ModIdFilter;
 import team.terrafirmagreg.exporter.spi.MergePolicy;
 import team.terrafirmagreg.exporter.spi.SourceSet;
-import team.terrafirmagreg.exporter.util.SnbtToJson;
+import team.terrafirmagreg.exporter.util.snbt.SnbtToJson;
 import tools.jackson.databind.JsonNode;
 
-public final class RegistryComponent implements ExportTask {
+public final class RegistryComponent implements ExportComponent {
     private final EntryKind kind;
     private final SourceSet<RegistrySource> sources;
     private final SourceSet<StackSource> stackSources;
@@ -77,12 +80,12 @@ public final class RegistryComponent implements ExportTask {
     }
 
     @Override
-    public ComponentId id() {
+    public ComponentKey id() {
         return switch (kind) {
-            case ITEM -> ComponentId.DATA_ITEMS;
-            case BLOCK -> ComponentId.DATA_BLOCKS;
-            case FLUID -> ComponentId.DATA_FLUIDS;
-            case ENTITY -> ComponentId.DATA_ENTITIES;
+            case ITEM -> ComponentKeys.DATA_ITEMS;
+            case BLOCK -> ComponentKeys.DATA_BLOCKS;
+            case FLUID -> ComponentKeys.DATA_FLUIDS;
+            case ENTITY -> ComponentKeys.DATA_ENTITIES;
         };
     }
 
@@ -92,18 +95,22 @@ public final class RegistryComponent implements ExportTask {
     }
 
     @Override
-    public Set<ComponentId> dependencies(ExportSpec request, Set<ComponentId> selected) {
-        LinkedHashSet<ComponentId> deps = new LinkedHashSet<>(ComponentId.selectedFrom(
-                selected, ComponentId.DATA_TAGS, ComponentId.DATA_RECIPES, ComponentId.DATA_RECIPE_CATEGORIES));
+    public Set<OutputKey<?>> inputs(NodeContext context) {
+        LinkedHashSet<ComponentKey> deps = new LinkedHashSet<>(ComponentCatalog.standard()
+                .selectedFrom(
+                        context.selected(),
+                        ComponentKeys.DATA_TAGS,
+                        ComponentKeys.DATA_RECIPES,
+                        ComponentKeys.DATA_RECIPE_CATEGORIES));
         if (kind == EntryKind.ENTITY) {
-            deps.addAll(ComponentId.selectedFrom(selected, ComponentId.DATA_GUIDE, ComponentId.DATA_QUESTS));
+            deps.addAll(ComponentCatalog.standard()
+                    .selectedFrom(context.selected(), ComponentKeys.DATA_GUIDE, ComponentKeys.DATA_QUESTS));
         }
-        return Set.copyOf(deps);
+        return ComponentOutputs.selectedInputs(context.selected(), deps);
     }
 
     @Override
-    public ComponentOutcome execute(ExportSpec request, DumpLayout layout, ExecutionContext context)
-            throws IOException {
+    public ComponentResult execute(ExportSpec request, DumpLayout layout, ExecutionContext context) throws IOException {
         RunScope scope = context.scope();
         ModIdFilter filter = request.filterFor(id());
         Map<String, RegistryRow> entries = new Object2ObjectLinkedOpenHashMap<>();
@@ -130,7 +137,7 @@ public final class RegistryComponent implements ExportTask {
         RecipeEdges edges = RecipeEdges.from(request, context);
         Map<String, List<String>> tagsByContent = tagMembership(request, context);
         Map<String, Integer> order = stackOrder(stacks);
-        ComponentOutcomeBuilder result = ComponentOutcome.builder(id());
+        ComponentResultBuilder result = ComponentResult.builder(id());
         Map<String, RegistryRow> written = new Object2ObjectLinkedOpenHashMap<>();
         int invalidIds = 0;
         for (Map.Entry<String, RegistryRow> e : entries.entrySet()) {
@@ -145,9 +152,8 @@ public final class RegistryComponent implements ExportTask {
         RegistrySnapshot snapshot = new RegistrySnapshot(kind, written, fills);
         result.ownedModIds(snapshot.ownedModIds())
                 .resourceDemand(snapshot.demand().merge(extraDemand))
-                .displayFills(fills)
-                .count(kind.id(), written.size())
-                .payload(payloadOf(written, stacks, captured.groups()));
+                .count(kind.id(), written.size());
+        contribute(context, written, stacks, captured.groups(), fills);
         if (invalidIds > 0) {
             result.diagnostic("Skipped " + invalidIds + " " + kind.id() + " with invalid ids");
         }
@@ -156,9 +162,9 @@ public final class RegistryComponent implements ExportTask {
 
     private Map<String, RegistryRow> entityVariants(
             Map<String, RegistryRow> entries, ExportSpec request, ExecutionContext context) {
-        List<ComponentId> producers = new ArrayList<>(3);
-        for (ComponentId producer :
-                List.of(ComponentId.DATA_GUIDE, ComponentId.DATA_QUESTS, ComponentId.DATA_RECIPES)) {
+        List<ComponentKey> producers = new ArrayList<>(3);
+        for (ComponentKey producer :
+                List.of(ComponentKeys.DATA_GUIDE, ComponentKeys.DATA_QUESTS, ComponentKeys.DATA_RECIPES)) {
             if (request.resolvedComponents().contains(producer)) {
                 producers.add(producer);
             }
@@ -192,9 +198,18 @@ public final class RegistryComponent implements ExportTask {
         return out;
     }
 
-    private LinkPayload payloadOf(
-            Map<String, RegistryRow> written, Map<String, StackEntry> stacks, List<StackGroup> groups) {
-        LinkPayloadBuilder payload = LinkPayload.builder();
+    private void contribute(
+            ExecutionContext context,
+            Map<String, RegistryRow> written,
+            Map<String, StackEntry> stacks,
+            List<StackGroup> groups,
+            List<DisplayFill> fills) {
+        switch (kind) {
+            case ITEM -> context.contribute(RegistryChannels.ITEMS, rowsAs(written, ItemEntry.class));
+            case BLOCK -> context.contribute(RegistryChannels.BLOCKS, rowsAs(written, BlockEntry.class));
+            case FLUID -> context.contribute(RegistryChannels.FLUIDS, rowsAs(written, FluidEntry.class));
+            case ENTITY -> context.contribute(RegistryChannels.ENTITIES, rowsAs(written, EntityEntry.class));
+        }
         if (!groups.isEmpty()) {
             List<StackGroup> rows = new ArrayList<>(groups.size());
             for (StackGroup group : groups) {
@@ -212,20 +227,27 @@ public final class RegistryComponent implements ExportTask {
                 }
             }
             if (!rows.isEmpty()) {
-                payload.stackGroupsByKind(Map.of(kind.id(), rows));
+                context.contribute(RegistryChannels.GROUPS, Map.of(kind.id(), rows));
             }
         }
-        payload.entries(kind, written.values());
-        return payload.build();
+        if (!fills.isEmpty()) {
+            context.contribute(LangChannels.DISPLAY_FILLS, Map.of(id(), List.copyOf(fills)));
+        }
+    }
+
+    private static <T extends RegistryRow> List<T> rowsAs(Map<String, RegistryRow> written, Class<T> type) {
+        List<T> out = new ObjectArrayList<>(written.size());
+        for (RegistryRow row : written.values()) {
+            out.add(type.cast(row));
+        }
+        return List.copyOf(out);
     }
 
     private Map<String, List<String>> tagMembership(ExportSpec request, ExecutionContext context) {
-        if (!request.resolvedComponents().contains(ComponentId.DATA_TAGS)) {
+        if (!request.resolvedComponents().contains(ComponentKeys.DATA_TAGS)) {
             return Map.of();
         }
-        List<TagEntry> tagEntries = VerticalOutputs.require(context, ComponentId.DATA_TAGS)
-                .payload()
-                .tags();
+        List<TagEntry> tagEntries = context.findMerged(RegistryChannels.TAGS).orElse(List.of());
         Map<String, List<String>> byContent = new TreeMap<>();
         String registry = registryName();
         for (TagEntry tagEntry : tagEntries) {

@@ -10,7 +10,7 @@ import lombok.experimental.UtilityClass;
 import team.terrafirmagreg.exporter.dump.AssetPaths;
 import team.terrafirmagreg.exporter.dump.DumpFiles;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
-import team.terrafirmagreg.exporter.dump.io.DumpWriter;
+import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
 
 @UtilityClass
 class MultiblockIndex {
@@ -52,8 +52,7 @@ class MultiblockIndex {
         if (models.isEmpty()) {
             return;
         }
-        Path out = AssetPaths.models(layout, namespace).resolve("multiblock.json");
-        Files.createDirectories(out.getParent());
-        DumpWriter.writeJson(out, models);
+        layout.writeJson(
+                new ArtifactAddress.Asset(namespace, "multiblock.json", ArtifactAddress.AssetKind.MODEL), models);
     }
 }

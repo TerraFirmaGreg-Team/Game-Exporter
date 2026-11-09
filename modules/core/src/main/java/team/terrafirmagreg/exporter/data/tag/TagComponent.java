@@ -5,20 +5,24 @@ import java.util.*;
 import team.terrafirmagreg.exporter.contract.dto.tag.TagEntry;
 import team.terrafirmagreg.exporter.contract.id.ResourceId;
 import team.terrafirmagreg.exporter.data.recipe.RecipeEdges;
+import team.terrafirmagreg.exporter.data.registry.RegistryChannels;
 import team.terrafirmagreg.exporter.data.tag.dump.TagDump;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
-import team.terrafirmagreg.exporter.engine.output.ComponentOutcome;
-import team.terrafirmagreg.exporter.engine.output.ComponentOutcomeBuilder;
-import team.terrafirmagreg.exporter.engine.output.LinkPayload;
-import team.terrafirmagreg.exporter.engine.pipeline.ExportTask;
-import team.terrafirmagreg.exporter.engine.plan.ExecutionContext;
-import team.terrafirmagreg.exporter.engine.spec.ComponentId;
+import team.terrafirmagreg.exporter.engine.graph.ExportComponent;
+import team.terrafirmagreg.exporter.engine.graph.NodeContext;
+import team.terrafirmagreg.exporter.engine.graph.OutputKey;
+import team.terrafirmagreg.exporter.engine.report.ComponentOutputs;
+import team.terrafirmagreg.exporter.engine.report.ComponentResult;
+import team.terrafirmagreg.exporter.engine.report.ComponentResultBuilder;
+import team.terrafirmagreg.exporter.engine.run.ExecutionContext;
+import team.terrafirmagreg.exporter.engine.spec.ComponentKey;
+import team.terrafirmagreg.exporter.engine.spec.ComponentKeys;
 import team.terrafirmagreg.exporter.engine.spec.ExportSpec;
 import team.terrafirmagreg.exporter.engine.spec.options.ModIdFilter;
 import team.terrafirmagreg.exporter.spi.MergePolicy;
 import team.terrafirmagreg.exporter.spi.SourceSet;
 
-public final class TagComponent implements ExportTask {
+public final class TagComponent implements ExportComponent {
     private final SourceSet<TagSource> sources = new SourceSet<>("tags", MergePolicy.UNION);
 
     private static TagEntry linked(String dumpId, TagEntry tagEntry, RecipeEdges edges, Map<String, TagEntry> tags) {
@@ -73,8 +77,8 @@ public final class TagComponent implements ExportTask {
     }
 
     @Override
-    public ComponentId id() {
-        return ComponentId.DATA_TAGS;
+    public ComponentKey id() {
+        return ComponentKeys.DATA_TAGS;
     }
 
     @Override
@@ -83,13 +87,13 @@ public final class TagComponent implements ExportTask {
     }
 
     @Override
-    public Set<ComponentId> dependencies(ExportSpec request, Set<ComponentId> selected) {
-        return ComponentId.selectedFrom(selected, ComponentId.DATA_RECIPES, ComponentId.DATA_RECIPE_CATEGORIES);
+    public Set<OutputKey<?>> inputs(NodeContext context) {
+        return ComponentOutputs.selectedInputs(
+                context.selected(), ComponentKeys.DATA_RECIPES, ComponentKeys.DATA_RECIPE_CATEGORIES);
     }
 
     @Override
-    public ComponentOutcome execute(ExportSpec request, DumpLayout layout, ExecutionContext context)
-            throws IOException {
+    public ComponentResult execute(ExportSpec request, DumpLayout layout, ExecutionContext context) throws IOException {
         ModIdFilter filter = request.filterFor(id());
         Map<String, TagEntry> tags = new LinkedHashMap<>();
         for (TagSource source : sources.available()) {
@@ -99,7 +103,7 @@ public final class TagComponent implements ExportTask {
         RecipeEdges edges = RecipeEdges.from(request, context);
         Map<String, TagEntry> written = new LinkedHashMap<>();
         int invalidIds = 0;
-        ComponentOutcomeBuilder result = ComponentOutcome.builder(id());
+        ComponentResultBuilder result = ComponentResult.builder(id());
         for (Map.Entry<String, TagEntry> e : tags.entrySet()) {
             String id = e.getKey();
             try {
@@ -111,9 +115,8 @@ public final class TagComponent implements ExportTask {
             TagEntry linked = linked(id, e.getValue(), edges, tags);
             written.put(id, linked);
         }
-        result.ownedModIds(ResourceId.namespacesOf(written.keySet()))
-                .count("tags", written.size())
-                .payload(LinkPayload.builder().tags(written.values()).build());
+        result.ownedModIds(ResourceId.namespacesOf(written.keySet())).count("tags", written.size());
+        context.contribute(RegistryChannels.TAGS, List.copyOf(written.values()));
         if (invalidIds > 0) {
             result.diagnostic("Skipped " + invalidIds + " tags with invalid ids");
         }
