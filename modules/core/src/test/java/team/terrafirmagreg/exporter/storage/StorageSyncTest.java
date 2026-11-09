@@ -28,7 +28,7 @@ class StorageSyncTest {
         write(root.resolve("schema/manifest.json"), "{}");
         write(root.resolve("lang/en_us.json"), "{\"a\":\"b\"}");
         write(root.resolve("keybinds.json"), "{}");
-        write(root.resolve("registry/items.json"), "{}");
+        write(root.resolve("registry/items/tfc.json"), "{}");
         write(root.resolve("data/tfc/items/x.json"), "{\"id\":1}");
         write(root.resolve("assets/tfc/textures/a.webp"), new byte[] {1, 2, 3, 4});
         write(root.resolve("meta/report.json"), "{}");

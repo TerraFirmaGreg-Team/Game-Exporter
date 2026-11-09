@@ -23,8 +23,8 @@ class ReportFileStatsTest {
     @Test
     void serialAndParallelWalksAgree() throws Exception {
         DumpFiles.write(root.resolve("lang/en_us.json"), json(128));
-        DumpFiles.write(root.resolve("registry/items.json"), json(64));
-        DumpFiles.write(root.resolve("registry/items.json"), json(256));
+        DumpFiles.write(root.resolve("registry/items/tfc.json"), json(64));
+        DumpFiles.write(root.resolve("registry/items/tfc.json"), json(256));
 
         Path source = Files.createTempFile("report-file-stats", ".bin");
         try {
@@ -37,7 +37,7 @@ class ReportFileStatsTest {
         ArtifactWriter writer = new ArtifactWriter(
                 new ArtifactAddressRenderer(root), new ArtifactCatalogBuilder(), new TransactionState());
         writer.write(new ArtifactAddress.Root("registry/recipes"), json(33), "application/json");
-        writer.write(new ArtifactAddress.Root("registry/items"), json(256), "application/json");
+        writer.write(new ArtifactAddress.Root("registry/items/tfc"), json(256), "application/json");
 
         Path webp = root.resolve("assets/mod/textures/atlas/items/page-0.webp");
         Files.createDirectories(webp.getParent());
@@ -60,7 +60,7 @@ class ReportFileStatsTest {
     @Test
     void fallsBackToWalkWhenUntracked() throws Exception {
         DumpFiles.write(root.resolve("lang/en_us.json"), json(16));
-        DumpFiles.write(root.resolve("registry/blocks.json"), json(32));
+        DumpFiles.write(root.resolve("registry/blocks/tfc.json"), json(32));
         try (RunScope scope = new RunScope()) {
             assertEquals(ReportFileStats.of(root), ReportFileStats.of(root, scope.tasks()));
         }

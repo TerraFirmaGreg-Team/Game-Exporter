@@ -43,10 +43,10 @@ class ArtifactWriterTest {
         TransactionState state = new TransactionState();
         ArtifactCatalogBuilder catalog = new ArtifactCatalogBuilder();
         ArtifactWriter writer = new ArtifactWriter(new ArtifactAddressRenderer(root), catalog, state);
-        ArtifactAddress address = new ArtifactAddress.Root("registry/items");
+        ArtifactAddress address = new ArtifactAddress.Root("registry/items/tfc");
         writer.write(address, json("old"), "application/json");
         writer.write(address, json("new"), "application/json");
-        assertArrayEquals(json("new"), Files.readAllBytes(root.resolve("registry/items.json")));
+        assertArrayEquals(json("new"), Files.readAllBytes(root.resolve("registry/items/tfc.json")));
         assertEquals(1, catalog.snapshot().size());
         assertEquals(json("new").length, catalog.snapshot().require(address).size());
     }

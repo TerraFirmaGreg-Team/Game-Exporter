@@ -19,7 +19,7 @@ class DumpDiffTest {
 
     @Test
     void identicalTreesAreClean() throws Exception {
-        writeBoth("registry/items.json", "{\"a\":1,\"b\":[1,2]}");
+        writeBoth("registry/items/tfc.json", "{\"a\":1,\"b\":[1,2]}");
         writeBoth("assets/mod/textures/recipe/x.webp", new byte[] {1, 2, 3});
         writeBoth("assets/mod/models/multiblock/y.glb", new byte[] {9});
         assertEquals(0, DumpDiff.run(golden, actual, new StringBuilder()));
@@ -37,8 +37,8 @@ class DumpDiffTest {
 
     @Test
     void jsonContentDiffFails() throws Exception {
-        write(golden, "registry/items.json", "{\"a\":1}");
-        write(actual, "registry/items.json", "{\"a\":2}");
+        write(golden, "registry/items/tfc.json", "{\"a\":1}");
+        write(actual, "registry/items/tfc.json", "{\"a\":2}");
         assertEquals(1, DumpDiff.run(golden, actual, new StringBuilder()));
     }
 

@@ -13,7 +13,7 @@ public record DumpLayout(Path root, DumpWriter writer, ArtifactWriter artifacts)
     public static final String MANIFEST = "manifest.json";
     public static final String META = "meta";
     public static final String SCHEMA_DUMP = "manifest";
-    public static final String LAYOUT = "v2";
+    public static final String LAYOUT = "v3";
     public static final String OBJECTS = "objects";
 
     public DumpLayout {
@@ -82,14 +82,6 @@ public record DumpLayout(Path root, DumpWriter writer, ArtifactWriter artifacts)
 
     public Path keybinds() {
         return root.resolve("keybinds.json");
-    }
-
-    public Path registryDir() {
-        return root.resolve("registry");
-    }
-
-    public Path registry(String kind) {
-        return registryDir().resolve(DumpPaths.requireToken(kind, "registry") + ".json");
     }
 
     public Path assets() {

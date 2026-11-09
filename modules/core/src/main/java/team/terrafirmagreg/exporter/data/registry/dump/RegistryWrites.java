@@ -13,6 +13,7 @@ import team.terrafirmagreg.exporter.contract.dto.recipe.RecipeCategory;
 import team.terrafirmagreg.exporter.contract.dto.tab.TabEntry;
 import team.terrafirmagreg.exporter.contract.dto.tag.TagEntry;
 import team.terrafirmagreg.exporter.contract.id.EntryKind;
+import team.terrafirmagreg.exporter.contract.id.ResourceId;
 import team.terrafirmagreg.exporter.data.category.dump.CategoryDump;
 import team.terrafirmagreg.exporter.data.registry.RegistryChannels;
 import team.terrafirmagreg.exporter.data.tab.dump.TabDump;
@@ -24,6 +25,8 @@ import team.terrafirmagreg.exporter.dump.io.DumpJson;
 import team.terrafirmagreg.exporter.engine.run.ExecutionOutputs;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
 import team.terrafirmagreg.exporter.engine.run.RunTasks;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 @UtilityClass
@@ -64,6 +67,86 @@ class RegistryWrites {
             }
         }
         return merged.isEmpty() ? null : (ObjectNode) DumpJson.mapper().valueToTree(merged);
+    }
+
+    static Map<String, ObjectNode> shards(ObjectNode root) {
+        Map<String, ObjectNode> out = new TreeMap<>();
+        for (Map.Entry<String, JsonNode> field : root.properties()) {
+            String namespace = ResourceId.namespaceOf(field.getKey());
+            if (namespace.isEmpty()) {
+                continue;
+            }
+            out.computeIfAbsent(namespace, ignored -> DumpJson.mapper().createObjectNode())
+                    .set(field.getKey(), field.getValue());
+        }
+        return out;
+    }
+
+    static ObjectNode iconsRoot(ObjectNode shard) {
+        ObjectNode out = DumpJson.mapper().createObjectNode();
+        for (Map.Entry<String, JsonNode> field : shard.properties()) {
+            if (!(field.getValue() instanceof ObjectNode row)) {
+                continue;
+            }
+            ObjectNode slim = iconRow(row, field.getKey());
+            if (slim != null) {
+                out.set(field.getKey(), slim);
+            }
+        }
+        return out.isEmpty() ? null : out;
+    }
+
+    private static ObjectNode iconRow(ObjectNode row, String key) {
+        ObjectNode slim = null;
+        JsonNode sprite = row.get("sprite");
+        if (sprite instanceof ObjectNode) {
+            slim = DumpJson.mapper().createObjectNode();
+            slim.set("id", row.has("id") ? row.get("id") : DumpJson.mapper().getNodeFactory().stringNode(key));
+            JsonNode display = displayName(row.get("display"));
+            if (display != null) {
+                slim.set("display", display);
+            }
+            slim.set("sprite", sprite);
+        }
+        if (row.get("variants") instanceof ArrayNode variants) {
+            ArrayNode slimVariants = DumpJson.mapper().createArrayNode();
+            for (JsonNode raw : variants) {
+                if (!(raw instanceof ObjectNode variant) || !(variant.get("sprite") instanceof ObjectNode)) {
+                    continue;
+                }
+                ObjectNode slimVariant = DumpJson.mapper().createObjectNode();
+                if (variant.hasNonNull("tag")) {
+                    slimVariant.set("tag", variant.get("tag"));
+                }
+                JsonNode display = displayName(variant.get("display"));
+                if (display != null) {
+                    slimVariant.set("display", display);
+                }
+                slimVariant.set("sprite", variant.get("sprite"));
+                slimVariants.add(slimVariant);
+            }
+            if (!slimVariants.isEmpty()) {
+                if (slim == null) {
+                    slim = DumpJson.mapper().createObjectNode();
+                    slim.set("id", row.has("id") ? row.get("id") : DumpJson.mapper().getNodeFactory().stringNode(key));
+                }
+                slim.set("variants", slimVariants);
+            }
+        }
+        return slim;
+    }
+
+    private static JsonNode displayName(JsonNode display) {
+        if (!(display instanceof ObjectNode object)) {
+            return null;
+        }
+        JsonNode name = object.get("name");
+        if (name == null || name.isNull()) {
+            return null;
+        }
+        ObjectNode slim = DumpJson.mapper().createObjectNode();
+        slim.set("name", name);
+        return slim;
     }
 
     static void writeTabs(DumpLayout layout, List<TabEntry> entries) throws IOException {

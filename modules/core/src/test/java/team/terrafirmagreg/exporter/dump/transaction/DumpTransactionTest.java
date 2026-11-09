@@ -31,7 +31,7 @@ class DumpTransactionTest {
         tx.contentCommitted();
         tx.write(META, JSON, "application/json");
         tx.supportingCommitted();
-        tx.finalizeManifest(Map.of("layout", "v2"));
+        tx.finalizeManifest(Map.of("layout", "v3"));
         tx.publish();
         tx.close();
         assertTrue(Files.isRegularFile(dest().resolve("manifest.json")));
