@@ -26,8 +26,8 @@ import team.terrafirmagreg.exporter.engine.spec.ComponentKeys;
 import team.terrafirmagreg.exporter.spi.PlatformCapabilities;
 import team.terrafirmagreg.exporter.vintage.category.JeiRecipeCategorySource;
 import team.terrafirmagreg.exporter.vintage.guide.PatchouliSource;
+import team.terrafirmagreg.exporter.vintage.lang.GameLangSource;
 import team.terrafirmagreg.exporter.vintage.lang.LangIndex;
-import team.terrafirmagreg.exporter.vintage.lang.ResourceLangSource;
 import team.terrafirmagreg.exporter.vintage.mod.ForgeModIndexSource;
 import team.terrafirmagreg.exporter.vintage.quest.FtbQuestsSource;
 import team.terrafirmagreg.exporter.vintage.recipe.JeiRecipeSource;
@@ -60,7 +60,7 @@ public final class LiveDump extends LiveExport<Minecraft> {
 
     @Override
     protected Set<String> packLanguages(Minecraft client) {
-        Set<String> langs = new TreeSet<>(LangIndex.discover(gameDir()));
+        Set<String> langs = new TreeSet<>(LangIndex.discover(gameDir()).languages());
         langs.addAll(QuestPaths.languages(gameDir()));
         return Set.copyOf(langs);
     }
@@ -88,9 +88,7 @@ public final class LiveDump extends LiveExport<Minecraft> {
                 .add(new TabComponent().addSource(new JeiTabSource()))
                 .add(new TagComponent().addSource(new OreDictTagSource()))
                 .add(new QuestComponent().addSource(quests, quests))
-                .add(new LangComponent()
-                        .addSource(new ResourceLangSource(client))
-                        .addModSource(new ForgeModIndexSource()))
+                .add(new LangComponent().addSource(new GameLangSource(client)).addModSource(new ForgeModIndexSource()))
                 .add(new TextureComponent().addSource(new ItemTextureSource(client)));
     }
 

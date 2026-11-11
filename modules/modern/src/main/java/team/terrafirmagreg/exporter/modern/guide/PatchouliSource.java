@@ -18,7 +18,7 @@ import net.minecraftforge.fml.ModList;
 import team.terrafirmagreg.exporter.data.guide.GuideBookPaths;
 import team.terrafirmagreg.exporter.data.guide.GuideBookSourceBase;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
-import team.terrafirmagreg.exporter.modern.lang.ResourceLangKeySource;
+import team.terrafirmagreg.exporter.modern.lang.GameLangKeySource;
 import vazkii.patchouli.api.PatchouliAPI;
 
 public final class PatchouliSource extends GuideBookSourceBase {
@@ -44,7 +44,7 @@ public final class PatchouliSource extends GuideBookSourceBase {
 
     @Override
     protected Set<String> resourceLangKeys(String lang, RunScope scope) {
-        return client == null ? Set.of() : ResourceLangKeySource.capture(client.getResourceManager(), lang, scope);
+        return client == null ? Set.of() : GameLangKeySource.capture(client, lang, scope);
     }
 
     @Override

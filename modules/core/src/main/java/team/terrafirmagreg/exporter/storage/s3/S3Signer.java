@@ -75,7 +75,7 @@ public final class S3Signer {
                     .append(':')
                     .append(entry.getValue().trim())
                     .append('\n');
-            if (signedHeaders.length() > 0) {
+            if (!signedHeaders.isEmpty()) {
                 signedHeaders.append(';');
             }
             signedHeaders.append(entry.getKey());
@@ -134,7 +134,7 @@ public final class S3Signer {
         pairs.sort((a, b) -> a[0].equals(b[0]) ? a[1].compareTo(b[1]) : a[0].compareTo(b[0]));
         StringBuilder out = new StringBuilder();
         for (String[] pair : pairs) {
-            if (out.length() > 0) {
+            if (!out.isEmpty()) {
                 out.append('&');
             }
             out.append(encode(pair[0])).append('=').append(encode(pair[1]));

@@ -199,9 +199,8 @@ final class AliScrollCompat {
                                 el.put("label", label);
                             }
                         }
-                        int index = options.size() == 1
-                                ? 0
-                                : (int) (System.currentTimeMillis() / 1000 % options.size());
+                        int index =
+                                options.size() == 1 ? 0 : (int) (System.currentTimeMillis() / 1000 % options.size());
                         if (options.get(index) instanceof AliLootOptionAccessor option) {
                             List<String> tooltip = lootTooltip(option.gameExporter$entry());
                             if (!tooltip.isEmpty()) {

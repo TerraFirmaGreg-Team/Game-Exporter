@@ -26,24 +26,24 @@ import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
 import team.terrafirmagreg.exporter.engine.run.RunTasks;
 import team.terrafirmagreg.exporter.engine.spec.options.ModIdFilter;
+import team.terrafirmagreg.exporter.util.ExportLog;
 
 @UtilityClass
 public class LangDump {
     public static int writeAssetLang(
-            Path gameDir, Path assetsRoot, List<String> languages, List<LangSource> sources, ModIdFilter modFilter)
+            Path assetsRoot, List<String> languages, List<LangSource> sources, ModIdFilter modFilter)
             throws IOException {
-        return writeAssetLang(gameDir, layoutFromAssets(assetsRoot), languages, sources, modFilter)
+        return writeAssetLang(layoutFromAssets(assetsRoot), languages, sources, modFilter)
                 .keys();
     }
 
     public static LangWrite writeAssetLang(
-            Path gameDir, DumpLayout layout, List<String> languages, List<LangSource> sources, ModIdFilter modFilter)
+            DumpLayout layout, List<String> languages, List<LangSource> sources, ModIdFilter modFilter)
             throws IOException {
-        return writeAssetLang(gameDir, layout, languages, sources, modFilter, List.of());
+        return writeAssetLang(layout, languages, sources, modFilter, List.of());
     }
 
     public static LangWrite writeAssetLang(
-            Path gameDir,
             DumpLayout layout,
             List<String> languages,
             List<LangSource> sources,
@@ -51,12 +51,11 @@ public class LangDump {
             List<DisplayFill> displayFills)
             throws IOException {
         try (RunScope scope = new RunScope()) {
-            return writeAssetLang(gameDir, layout, languages, sources, modFilter, displayFills, null, scope);
+            return writeAssetLang(layout, languages, sources, modFilter, displayFills, null, scope);
         }
     }
 
     public static LangWrite writeAssetLang(
-            Path gameDir,
             DumpLayout layout,
             List<String> languages,
             List<LangSource> sources,
@@ -66,59 +65,90 @@ public class LangDump {
             RunScope scope)
             throws IOException {
         Files.createDirectories(layout.langDir());
+        ModIdFilter filter = modFilter == null ? ModIdFilter.allowAll() : modFilter;
+        if (!filter.allowsAll()) {
+            ExportLog.warn(
+                    "lang mod filter cannot remove keys from the merged game language table; it applies to namespace bookkeeping only");
+        }
         List<String> langs = languages == null || languages.isEmpty() ? List.of("en_us") : languages;
         List<String> ordered = new ObjectArrayList<>(langs);
         if (ordered.remove("en_us")) {
             ordered.add(0, "en_us");
         }
+        List<LangSource> live = sources == null ? List.of() : sources;
         int totalKeys = 0;
         Map<String, String> keybinds = new Object2ObjectLinkedOpenHashMap<>();
-        ObjectLinkedOpenHashSet<String> mods = new ObjectLinkedOpenHashSet<>();
         Map<String, Set<String>> namespaceLanguages = new TreeMap<>();
         Map<String, Map<String, String>> mergedLangs = new Object2ObjectLinkedOpenHashMap<>();
         Map<String, Map<String, Map<String, String>>> extrasByLang = extras == null ? Map.of() : extras.byLang();
-        Map<String, Map<String, Object>> english = null;
+        Map<String, String> english = null;
+        for (LangSource source : live) {
+            if (!source.isAvailable()) {
+                continue;
+            }
+            Map<String, Set<String>> presence = source.namespaceLanguages();
+            if (presence == null) {
+                continue;
+            }
+            presence.forEach((namespace, langsPresent) -> {
+                if (filter.allows(namespace) && langsPresent != null) {
+                    namespaceLanguages
+                            .computeIfAbsent(namespace, ignored -> new TreeSet<>())
+                            .addAll(langsPresent);
+                }
+            });
+        }
         List<CompletableFuture<LangSnapshot>> assembled = new ObjectArrayList<>();
         for (String lang : ordered) {
             if (scope == null) {
-                assembled.add(
-                        CompletableFuture.completedFuture(LangAssembler.assemble(gameDir, lang, sources, modFilter)));
+                assembled.add(CompletableFuture.completedFuture(LangAssembler.assemble(lang, live)));
             } else {
-                assembled.add(
-                        scope.tasks().supply(() -> LangAssembler.assemble(gameDir, lang, sources, modFilter, scope)));
+                assembled.add(scope.tasks().supply(() -> LangAssembler.assemble(lang, live, scope)));
             }
         }
         for (int i = 0; i < ordered.size(); i++) {
             String lang = ordered.get(i);
             LangSnapshot snapshot = RunTasks.await(assembled.get(i));
-            snapshot = LangAssembler.applyDisplayFills(snapshot, displayFills, keybinds);
-            snapshot = LangAssembler.applyExtras(snapshot, extrasByLang.get(lang));
-            Set<String> owned = snapshot.ownedModIds();
-            Map<String, Map<String, Object>> byMod = snapshot.mutableByMod();
-            if ("en_us".equals(lang)) {
-                english = new Object2ObjectLinkedOpenHashMap<>(byMod);
-            } else if (english != null) {
-                LangMerge.dropSameAsCanonical(byMod, english);
-            }
-            mods.addAll(owned);
-            keybinds.putAll(snapshot.keybinds());
-            for (Map.Entry<String, Map<String, Object>> entry : byMod.entrySet()) {
-                if (entry.getValue() != null && !entry.getValue().isEmpty()) {
-                    namespaceLanguages
-                            .computeIfAbsent(entry.getKey(), ignored -> new TreeSet<>())
-                            .add(lang);
+            snapshot = LangAssembler.applyDisplayFills(snapshot, displayFills, keybinds, lang);
+            Map<String, Map<String, String>> additions = extrasByLang.get(lang);
+            snapshot = LangAssembler.applyExtras(snapshot, additions);
+            Map<String, String> strings = snapshot.mutableStrings();
+            if (displayFills != null) {
+                for (DisplayFill fill : displayFills) {
+                    if (fill != null && strings.containsKey(fill.key()) && filter.allows(fill.modId())) {
+                        namespaceLanguages
+                                .computeIfAbsent(fill.modId(), ignored -> new TreeSet<>())
+                                .add(lang);
+                    }
                 }
             }
-            Map<String, String> flat = LangMerge.flattenStringsLaterWins(new TreeMap<>(byMod));
-            if (!flat.isEmpty()) {
-                mergedLangs.put(lang, flat);
-                totalKeys += flat.size();
+            if (additions != null) {
+                for (Map.Entry<String, Map<String, String>> entry : additions.entrySet()) {
+                    if (entry.getValue() != null
+                            && entry.getValue().keySet().stream().anyMatch(strings::containsKey)
+                            && filter.allows(entry.getKey())) {
+                        namespaceLanguages
+                                .computeIfAbsent(entry.getKey(), ignored -> new TreeSet<>())
+                                .add(lang);
+                    }
+                }
+            }
+            keybinds.putAll(snapshot.keybinds());
+            if ("en_us".equals(lang)) {
+                english = new Object2ObjectLinkedOpenHashMap<>(strings);
+            } else if (english != null) {
+                LangMerge.dropSameAsCanonical(strings, english);
+            }
+            if (!strings.isEmpty()) {
+                mergedLangs.put(lang, strings);
+                totalKeys += strings.size();
             }
         }
         for (Map.Entry<String, Map<String, String>> entry : mergedLangs.entrySet()) {
             layout.writeJson(new ArtifactAddress.Root("lang/" + entry.getKey()), entry.getValue());
         }
         writeKeybinds(layout, keybinds);
+        ObjectLinkedOpenHashSet<String> mods = new ObjectLinkedOpenHashSet<>(namespaceLanguages.keySet());
         Set<String> keybindNamespaces = new TreeSet<>();
         for (String key : keybinds.keySet()) {
             keybindNamespaces.add(keybindOwner(key, mods));
@@ -126,8 +156,8 @@ public class LangDump {
         return new LangWrite(totalKeys, Set.copyOf(mods), mergedLangs, namespaceLanguages, keybindNamespaces);
     }
 
-    public static int writeAssetLang(Path gameDir, Path assetsRoot, List<String> languages) throws IOException {
-        return writeAssetLang(gameDir, assetsRoot, languages, List.of(), ModIdFilter.allowAll());
+    public static int writeAssetLang(Path assetsRoot, List<String> languages) throws IOException {
+        return writeAssetLang(assetsRoot, languages, List.of(), ModIdFilter.allowAll());
     }
 
     public static void writeKeybinds(DumpLayout layout, Map<String, String> keybinds) throws IOException {

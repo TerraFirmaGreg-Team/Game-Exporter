@@ -17,15 +17,19 @@ import net.minecraft.client.Minecraft;
 import net.minecraftforge.fml.common.Loader;
 import team.terrafirmagreg.exporter.data.guide.GuideBookPaths;
 import team.terrafirmagreg.exporter.data.guide.GuideBookSourceBase;
+import team.terrafirmagreg.exporter.engine.run.RunScope;
 import team.terrafirmagreg.exporter.util.ExportLog;
 import team.terrafirmagreg.exporter.util.PackFiles;
+import team.terrafirmagreg.exporter.vintage.lang.GameLangKeySource;
 
 public final class PatchouliSource extends GuideBookSourceBase {
 
+    private final Minecraft client;
     private volatile List<File> packs;
 
     public PatchouliSource(Minecraft client, String defaultNamespace) {
         super(defaultNamespace);
+        this.client = client;
     }
 
     @Override
@@ -78,6 +82,11 @@ public final class PatchouliSource extends GuideBookSourceBase {
     @Override
     protected boolean bookComplete(Map<String, byte[]> files) {
         return !files.isEmpty();
+    }
+
+    @Override
+    protected Set<String> resourceLangKeys(String lang, RunScope scope) {
+        return client == null ? Set.of() : GameLangKeySource.capture(client, lang, scope);
     }
 
     private static void scanDiskBooks(Path booksRoot, String fallbackNs, Set<String> out) {

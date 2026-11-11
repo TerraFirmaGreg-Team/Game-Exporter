@@ -1,6 +1,9 @@
 package team.terrafirmagreg.exporter.modern.lang;
 
+import java.util.Collections;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import lombok.experimental.UtilityClass;
 import net.minecraft.resources.ResourceLocation;
@@ -21,6 +24,24 @@ public class LangIndex {
         packLangs(assets, langs);
         bookLocales(assets, langs);
         return Set.copyOf(langs);
+    }
+
+    public static Map<String, Set<String>> namespaces(ResourceManager assets) {
+        if (assets == null) {
+            return Map.of();
+        }
+        Map<String, Set<String>> out = new TreeMap<>();
+        for (ResourceLocation location :
+                assets.listResources(LANG_ROOT, LangIndex::isLangFile).keySet()) {
+            String locale = localeStem(location.getPath());
+            if (LangExtractor.isLocale(locale)) {
+                out.computeIfAbsent(location.getNamespace(), ignored -> new TreeSet<>())
+                        .add(locale);
+            }
+        }
+        Map<String, Set<String>> frozen = new TreeMap<>();
+        out.forEach((namespace, langs) -> frozen.put(namespace, Set.copyOf(langs)));
+        return Collections.unmodifiableMap(frozen);
     }
 
     private static void packLangs(ResourceManager assets, Set<String> langs) {
@@ -56,8 +77,7 @@ public class LangIndex {
     }
 
     private static boolean isLangFile(ResourceLocation location) {
-        String path = location.getPath();
-        return path.endsWith(".json") || path.endsWith(".snbt");
+        return location.getPath().endsWith(".json");
     }
 
     private static String localeStem(String path) {

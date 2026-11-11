@@ -24,8 +24,8 @@ import team.terrafirmagreg.exporter.engine.live.LiveExport;
 import team.terrafirmagreg.exporter.engine.run.ExportPipeline;
 import team.terrafirmagreg.exporter.modern.category.EmiRecipeCategorySource;
 import team.terrafirmagreg.exporter.modern.guide.PatchouliSource;
+import team.terrafirmagreg.exporter.modern.lang.GameLangSource;
 import team.terrafirmagreg.exporter.modern.lang.LangIndex;
-import team.terrafirmagreg.exporter.modern.lang.ResourceLangSource;
 import team.terrafirmagreg.exporter.modern.mod.ForgeModIndexSource;
 import team.terrafirmagreg.exporter.modern.model.EntityModelSource;
 import team.terrafirmagreg.exporter.modern.model.GuideModelSource;
@@ -92,9 +92,7 @@ public final class LiveDump extends LiveExport<Minecraft> {
                 .add(new TabComponent().addSource(new EmiTabSource()))
                 .add(new TagComponent().addSource(new RegistryTagSource()))
                 .add(new QuestComponent().addSource(quests, quests))
-                .add(new LangComponent()
-                        .addSource(new ResourceLangSource(client))
-                        .addModSource(new ForgeModIndexSource()))
+                .add(new LangComponent().addSource(new GameLangSource(client)).addModSource(new ForgeModIndexSource()))
                 .add(new TextureComponent().addSource(new ItemTextureSource(client)))
                 .add(new ModelComponent()
                         .addSource(new GuideModelSource(client))

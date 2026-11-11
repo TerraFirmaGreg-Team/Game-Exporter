@@ -40,7 +40,7 @@ public abstract class QuestBookSourceBase implements QuestSource, QuestNormalize
 
     @Override
     public Set<String> langKeys(String lang, RunScope scope) {
-        Set<String> keys = new TreeSet<>(LangKeySource.overrides(gameDir(), lang));
+        Set<String> keys = new TreeSet<>();
         Path source = findOnDisk(gameDir());
         if (source != null) {
             keys.addAll(LangKeySource.langDir(source.resolve("lang"), lang));

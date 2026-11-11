@@ -19,24 +19,6 @@ import tools.jackson.databind.node.ObjectNode;
 @UtilityClass
 public class LangKeySource {
 
-    public static Set<String> overrides(Path gameDir, String lang) {
-        if (gameDir == null || lang == null || lang.isBlank()) {
-            return Set.of();
-        }
-        Map<String, Map<String, Object>> byMod = new Object2ObjectLinkedOpenHashMap<>();
-        try {
-            LangMerge.mergeOverridesIntoByMod(byMod, gameDir, lang);
-        } catch (IOException e) {
-            ExportLog.warn("failed reading lang overrides lang={}", lang, e);
-            return Set.of();
-        }
-        Set<String> keys = new TreeSet<>();
-        for (Map<String, Object> strings : byMod.values()) {
-            keys.addAll(strings.keySet());
-        }
-        return keys;
-    }
-
     public static Set<String> langDir(Path dir, String lang) {
         if (dir == null || lang == null || lang.isBlank() || !Files.isDirectory(dir)) {
             return Set.of();

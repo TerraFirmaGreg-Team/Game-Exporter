@@ -2,29 +2,24 @@ package team.terrafirmagreg.exporter.assets.lang;
 
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import lombok.experimental.UtilityClass;
 import team.terrafirmagreg.exporter.contract.text.DisplayFill;
+import team.terrafirmagreg.exporter.contract.text.DisplayKeys;
+import team.terrafirmagreg.exporter.contract.text.DumpText;
 import team.terrafirmagreg.exporter.contract.text.DumpTextFormat;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
-import team.terrafirmagreg.exporter.engine.spec.options.ModIdFilter;
 
 @UtilityClass
 public class LangAssembler {
 
-    public static LangSnapshot assemble(Path gameDir, String lang, List<LangSource> sources, ModIdFilter modFilter)
-            throws IOException {
-        return assemble(gameDir, lang, sources, modFilter, null);
+    public static LangSnapshot assemble(String lang, List<LangSource> sources) throws IOException {
+        return assemble(lang, sources, null);
     }
 
-    public static LangSnapshot assemble(
-            Path gameDir, String lang, List<LangSource> sources, ModIdFilter modFilter, RunScope scope)
-            throws IOException {
-        ModIdFilter filter = modFilter == null ? ModIdFilter.allowAll() : modFilter;
+    public static LangSnapshot assemble(String lang, List<LangSource> sources, RunScope scope) throws IOException {
         List<LangSource> live = sources == null ? List.of() : sources;
         LangSnapshot snapshot = LangSnapshot.empty();
         for (LangSource source : live) {
@@ -32,32 +27,51 @@ public class LangAssembler {
                 snapshot = snapshot.mergeLater(scope == null ? source.capture(lang) : source.capture(lang, scope));
             }
         }
-        Map<String, Map<String, Object>> byMod = snapshot.mutableByMod();
-        LangMerge.mergeOverridesIntoByMod(byMod, gameDir, lang);
-        LangMerge.applyModFilter(byMod, filter);
-        return new LangSnapshot(byMod, snapshot.keybinds());
+        return snapshot;
     }
 
     public static LangSnapshot applyDisplayFills(
             LangSnapshot snapshot, List<DisplayFill> fills, Map<String, String> keybinds) {
-        if (snapshot == null || fills == null || fills.isEmpty()) {
-            return snapshot == null ? LangSnapshot.empty() : snapshot;
+        return applyDisplayFills(snapshot, fills, keybinds, "en_us");
+    }
+
+    public static LangSnapshot applyDisplayFills(
+            LangSnapshot snapshot, List<DisplayFill> fills, Map<String, String> keybinds, String lang) {
+        if (snapshot == null) {
+            snapshot = LangSnapshot.empty();
         }
-        Map<String, Map<String, Object>> byMod = snapshot.mutableByMod();
-        Map<String, String> flat = LangMerge.flattenStringsLaterWins(new TreeMap<>(byMod));
+        if (fills == null || fills.isEmpty()) {
+            return snapshot;
+        }
+        Map<String, String> strings = snapshot.mutableStrings();
         Map<String, String> binds = keybinds == null ? Map.of() : keybinds;
+        boolean canonical = "en_us".equals(lang);
         for (DisplayFill fill : fills) {
             if (fill == null) {
                 continue;
             }
-            String formatted = DumpTextFormat.format(fill.name(), flat::get, binds);
+            String formatted = DumpTextFormat.format(fill.name(), strings::get, binds);
             if (formatted == null || formatted.isBlank() || formatted.contains("%s") || formatted.contains("%1$s")) {
                 continue;
             }
-            byMod.computeIfAbsent(fill.modId(), key -> new Object2ObjectLinkedOpenHashMap<>())
-                    .put(fill.key(), formatted);
+            if (!canonical && isLiteral(fill.name()) && keepsExisting(strings.get(fill.key()), formatted)) {
+                continue;
+            }
+            strings.put(fill.key(), formatted);
         }
-        return new LangSnapshot(byMod, snapshot.keybinds());
+        return new LangSnapshot(strings, snapshot.keybinds());
+    }
+
+    private static boolean isLiteral(DumpText name) {
+        return name != null && name.text() != null && name.translate() == null;
+    }
+
+    private static boolean keepsExisting(String existing, String formatted) {
+        return existing != null && !existing.equals(formatted) && !isKeyReference(existing);
+    }
+
+    private static boolean isKeyReference(String value) {
+        return value.indexOf(' ') < 0 && DisplayKeys.isLangKey(value);
     }
 
     public static LangSnapshot applyExtras(LangSnapshot snapshot, Map<String, Map<String, String>> extras) {
@@ -67,13 +81,13 @@ public class LangAssembler {
         if (extras == null || extras.isEmpty()) {
             return snapshot;
         }
-        Map<String, Map<String, Object>> byMod = snapshot.mutableByMod();
-        for (Map.Entry<String, Map<String, String>> entry : extras.entrySet()) {
-            Map<String, Object> into =
-                    byMod.computeIfAbsent(entry.getKey(), key -> new Object2ObjectLinkedOpenHashMap<>());
-            entry.getValue().forEach(into::putIfAbsent);
+        Map<String, String> strings = snapshot.mutableStrings();
+        for (Map<String, String> added : extras.values()) {
+            if (added != null) {
+                added.forEach(strings::putIfAbsent);
+            }
         }
-        return new LangSnapshot(byMod, snapshot.keybinds());
+        return new LangSnapshot(strings, snapshot.keybinds());
     }
 
     public static Map<String, Map<String, String>> freezeLangs(Map<String, Map<String, String>> langs) {

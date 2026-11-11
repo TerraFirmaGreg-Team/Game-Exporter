@@ -6,7 +6,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraftforge.fml.ModList;
 import team.terrafirmagreg.exporter.data.quest.QuestBookSourceBase;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
-import team.terrafirmagreg.exporter.modern.lang.ResourceLangKeySource;
+import team.terrafirmagreg.exporter.modern.lang.GameLangKeySource;
 
 public final class FtbQuestsSource extends QuestBookSourceBase {
 
@@ -28,6 +28,6 @@ public final class FtbQuestsSource extends QuestBookSourceBase {
 
     @Override
     protected Set<String> resourceLangKeys(String lang, RunScope scope) {
-        return client == null ? Set.of() : ResourceLangKeySource.capture(client.getResourceManager(), lang, scope);
+        return client == null ? Set.of() : GameLangKeySource.capture(client, lang, scope);
     }
 }

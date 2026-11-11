@@ -8,10 +8,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
-import team.terrafirmagreg.exporter.assets.lang.LangKeySource;
 import team.terrafirmagreg.exporter.contract.id.ResourceId;
 import team.terrafirmagreg.exporter.data.guide.GuideSnapshot.GuideBook;
 import team.terrafirmagreg.exporter.engine.demand.DemandExtractor;
@@ -155,9 +153,7 @@ public abstract class GuideBookSourceBase implements GuideSource {
 
     @Override
     public Set<String> langKeys(String lang, RunScope scope) {
-        Set<String> keys = new TreeSet<>(LangKeySource.overrides(gameDir(), lang));
-        keys.addAll(resourceLangKeys(lang, scope));
-        return Set.copyOf(keys);
+        return Set.copyOf(resourceLangKeys(lang, scope));
     }
 
     protected Set<String> resourceLangKeys(String lang, RunScope scope) {

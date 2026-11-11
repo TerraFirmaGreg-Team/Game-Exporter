@@ -94,7 +94,7 @@ public final class LangComponent implements ExportComponent {
             }
         }
         LangWrite written = LangDump.writeAssetLang(
-                request.gameDir(), layout, request.languages(), sources.available(), filter, fills, additions, scope);
+                layout, request.languages(), sources.available(), filter, fills, additions, scope);
         context.contribute(LangChannels.LANGS, written.langs());
         context.contribute(LangChannels.NAMESPACE_LANGUAGES, written.namespaceLanguages());
         context.contribute(LangChannels.KEYBIND_NAMESPACES, written.keybindNamespaces());

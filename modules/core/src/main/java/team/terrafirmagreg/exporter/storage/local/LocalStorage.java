@@ -1,5 +1,6 @@
 package team.terrafirmagreg.exporter.storage.local;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -18,7 +19,7 @@ public final class LocalStorage implements StorageTarget {
     }
 
     private Path resolve(String key) {
-        Path file = root.resolve(key.replace('/', java.io.File.separatorChar)).normalize();
+        Path file = root.resolve(key.replace('/', File.separatorChar)).normalize();
         if (!file.startsWith(root)) {
             throw new IllegalArgumentException("Key escaped storage root: " + key);
         }
