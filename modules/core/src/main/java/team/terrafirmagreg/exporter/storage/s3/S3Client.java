@@ -144,7 +144,7 @@ public final class S3Client {
         try {
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
             factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-            factory.setFeature("https://apache.org/xml/features/disallow-doctype-decl", true);
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
             factory.setExpandEntityReferences(false);
             Document doc = factory.newDocumentBuilder()
                     .parse(new InputSource(new StringReader(new String(body, StandardCharsets.UTF_8))));
