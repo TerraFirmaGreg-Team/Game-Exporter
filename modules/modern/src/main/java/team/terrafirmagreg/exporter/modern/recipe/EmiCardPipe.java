@@ -4,6 +4,7 @@ import dev.emi.emi.api.EmiApi;
 import dev.emi.emi.api.recipe.EmiRecipe;
 import dev.emi.emi.api.recipe.EmiRecipeManager;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -23,8 +24,11 @@ import java.util.concurrent.atomic.AtomicReference;
 import lombok.experimental.UtilityClass;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraftforge.registries.ForgeRegistries;
+import team.terrafirmagreg.exporter.assets.texture.TextureCopy;
+import team.terrafirmagreg.exporter.contract.id.ResourceId;
 import team.terrafirmagreg.exporter.data.recipe.RecipeSnapshot;
 import team.terrafirmagreg.exporter.data.recipe.capture.CardShot;
 import team.terrafirmagreg.exporter.data.recipe.capture.CardWidget;
@@ -82,6 +86,7 @@ class EmiCardPipe {
         EmiCardShots shots = sink == null
                 ? null
                 : onRenderThread(client, scope, () -> EmiCardShots.open(sink, options, layout, scope));
+        emitScrollGuiTextures(client, scope, layout);
         boolean handedOff = false;
         try {
             int n = list.size();
@@ -130,6 +135,7 @@ class EmiCardPipe {
             Semaphore gate = window;
             Consumed consumed = onRenderThread(client, scope, () -> consume(list, channel, gate, shots, scope, prep));
             Map<String, String> imageSrcs = sink == null ? Map.of() : sink.imageSrcs();
+            patchScrollOverlays(consumed.captures(), imageSrcs);
             Set<String> failedCards = new HashSet<>();
             if (sink != null) {
                 failedCards.addAll(sink.failedCards());
@@ -259,13 +265,21 @@ class EmiCardPipe {
                     if (widgets.isEmpty()) {
                         widgets = EmiCardFallbackWidgets.build(recipe);
                     }
-                    MemberGrid grid = MemberGrid.detect(widgets, card.displayH());
+                    EmiScrollViewport scroll = EmiScrollViewport.detect(
+                            recipe,
+                            card.widgets() == null ? List.of() : card.widgets().emiWidgets(),
+                            widgets);
+                    boolean composed = scroll != null && scroll.decomposed();
+                    MemberGrid grid = composed ? null : MemberGrid.detect(widgets, card.displayH());
                     if (grid != null) {
                         widgets = grid.compacted(widgets);
                     }
-                    CardShot shot = shots == null
-                            ? null
-                            : shots.shoot(
+                    CardShot shot = null;
+                    if (shots != null) {
+                        if (composed) {
+                            shots.overlay(imageId, category, scroll.overlay());
+                        } else {
+                            shot = shots.shoot(
                                     imageId,
                                     card,
                                     card.widgets() == null
@@ -273,12 +287,16 @@ class EmiCardPipe {
                                             : card.widgets().emiWidgets(),
                                     widgets,
                                     grid);
+                        }
+                    }
                     boolean hasImage = shot != null;
                     unknownTypes.merge(recipe.getClass().getName(), 1, Integer::sum);
                     Map<String, Object> properties = recipeProperties(recipe);
                     if (grid != null) {
                         properties.put("grid", grid.properties());
                         properties.put("members", grid.memberRefs());
+                    } else if (scroll != null) {
+                        properties.put("scroll", scroll.properties());
                     }
                     captures.add(new RecipeLayoutPass.Capture(
                             id,
@@ -286,13 +304,13 @@ class EmiCardPipe {
                             category,
                             card.displayW(),
                             grid != null ? grid.pageDisplayHeight() : card.displayH(),
-                            hasImage ? EmiRecipeGui.guiScale() : null,
-                            hasImage ? shot.margin() : null,
+                            hasImage || composed ? EmiRecipeGui.guiScale() : null,
+                            hasImage ? shot.margin() : composed ? EmiRecipeGui.MARGIN : null,
                             widgets,
                             properties,
                             hasImage,
-                            hasImage ? shot.imageW() : null,
-                            hasImage ? shot.imageH() : null));
+                            hasImage ? shot.imageW() : composed ? EmiRecipeGui.pixelW(card.displayW()) : null,
+                            hasImage ? shot.imageH() : composed ? EmiRecipeGui.pixelH(card.displayH()) : null));
                 } catch (VirtualMachineError e) {
                     throw e;
                 } catch (Throwable t) {
@@ -525,6 +543,52 @@ class EmiCardPipe {
                 stats == null ? 0 : stats.fboNs / 1_000_000);
     }
 
+    private static void patchScrollOverlays(List<RecipeLayoutPass.Capture> captures, Map<String, String> imageSrcs) {
+        if (captures == null || captures.isEmpty()) {
+            return;
+        }
+        for (RecipeLayoutPass.Capture capture : captures) {
+            if (capture == null || capture.properties() == null) {
+                continue;
+            }
+            Object raw = capture.properties().get("scroll");
+            if (!(raw instanceof Map<?, ?> scrollMap)) {
+                continue;
+            }
+            @SuppressWarnings("unchecked")
+            Map<String, Object> scroll = (Map<String, Object>) scrollMap;
+            patchOverlaySrc(scroll, capture.imageId(), imageSrcs);
+        }
+    }
+
+    private static void patchOverlaySrc(Map<String, Object> scroll, String imageId, Map<String, String> imageSrcs) {
+        if (!(scroll.get("overlay") instanceof Boolean)) {
+            return;
+        }
+        String src = imageSrcs.get(imageId + ".overlay");
+        String namespace = null;
+        try {
+            ResourceId parsed = ResourceId.parse(imageId);
+            namespace = parsed.namespace();
+            if (src == null) {
+                src = DumpLayout.recipeImageSrc(parsed.path() + ".overlay");
+            }
+        } catch (IllegalArgumentException ignored) {
+        }
+        if (src != null && !src.startsWith("assets/")) {
+            if (namespace == null) {
+                src = null;
+            } else {
+                src = "assets/" + namespace + "/" + src;
+            }
+        }
+        if (src != null) {
+            scroll.put("overlay", src);
+        } else {
+            scroll.remove("overlay");
+        }
+    }
+
     private static Enumerated enumerateAll() {
         List<EmiRecipe> all = new ArrayList<>(enumerateRecipes());
         all.addAll(EmiBlockTagRecipes.synthesized());
@@ -538,6 +602,38 @@ class EmiCardPipe {
         }
         List<EmiRecipe> recipes = manager.getRecipes();
         return recipes != null ? recipes : List.of();
+    }
+
+    private static void emitScrollGuiTextures(Minecraft client, RunScope scope, DumpLayout layout) {
+        if (!AliScrollCompat.loaded() || client == null || layout == null) {
+            return;
+        }
+        ResourceManager manager = client.getResourceManager();
+        if (manager == null) {
+            return;
+        }
+        TextureCopy.ResourceReader assets = location -> {
+            ResourceLocation loc = ResourceLocation.tryParse(location);
+            if (loc == null) {
+                return null;
+            }
+            return manager.getResource(loc)
+                    .map(resource -> {
+                        try (InputStream in = resource.open()) {
+                            return in.readAllBytes();
+                        } catch (IOException e) {
+                            return null;
+                        }
+                    })
+                    .orElse(null);
+        };
+        for (String texture : List.of(
+                "ali:textures/gui/gui.png", "emi:textures/gui/widgets.png", "emi:textures/gui/background.png")) {
+            TextureCopy.CopyPlan plan = TextureCopy.planTextureCopy(assets, layout, texture);
+            if (plan != null) {
+                scope.tasks().submit(() -> TextureCopy.writePlannedTexture(plan, layout));
+            }
+        }
     }
 
     private static int producerCount() {

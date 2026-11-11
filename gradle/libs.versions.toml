@@ -17,6 +17,8 @@ jspecify = "1.0.1"
 emi = "1.1.24+1.20.1"
 patchouliFile = "7731017"
 jeiFile = "5846804"
+aliFile = "9208463"
+aciFile = "9208458"
 mixin = "0.8.7"
 
 [libraries]
@@ -37,6 +39,8 @@ konf-core = { module = "team.terrafirmagreg:konf-core", version.ref = "konf" }
 konf-json = { module = "team.terrafirmagreg:konf-json", version.ref = "konf" }
 patchouli = { module = "curse.maven:patchouli-306770", version.ref = "patchouliFile" }
 jei = { module = "curse.maven:jei-238222", version.ref = "jeiFile" }
+ali = { module = "curse.maven:advanced-loot-info-1205426", version.ref = "aliFile" }
+aci = { module = "curse.maven:advanced-core-info-1661923", version.ref = "aciFile" }
 mixin = { module = "org.spongepowered:mixin", version.ref = "mixin" }
 
 [plugins]

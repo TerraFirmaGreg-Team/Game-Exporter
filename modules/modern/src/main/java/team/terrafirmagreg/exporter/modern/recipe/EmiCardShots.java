@@ -121,6 +121,23 @@ final class EmiCardShots implements AutoCloseable {
         this.renderer = windowSizedRenderer(window);
         this.savedMaxRecipeScreenHeight = EmiConfig.maximumRecipeScreenHeight;
         EmiConfig.maximumRecipeScreenHeight = RecipeCardImage.WEBP_MAX_EDGE;
+        EmiViewportHeight.floor(9 + 7 * 18 + 5);
+    }
+
+    void overlay(String imageId, String category, AliOverlay.Spec spec) {
+        if (spec == null) {
+            return;
+        }
+        try {
+            ensureFramebuffer(spec.contentW() * EmiRecipeGui.guiScale(), spec.contentH() * EmiRecipeGui.guiScale());
+            RecipeCardImage image = AliOverlay.capture(canvas, renderer, spec);
+            sinkAccept(imageId + ".overlay", category, image);
+        } catch (VirtualMachineError e) {
+            throw e;
+        } catch (Throwable t) {
+            imageFailures++;
+            warnCap.warn("card overlay {} failed: {}", imageId, t.toString());
+        }
     }
 
     static EmiCardShots open(RecipeCardSink sink, RecipesComponentConfig options, DumpLayout layout, RunScope scope) {
@@ -255,17 +272,24 @@ final class EmiCardShots implements AutoCloseable {
             }
             t = System.nanoTime();
             ensureFramebuffer(pw, ph);
-            if (AliProbe.enabled() && AliProbe.appliesTo(recipe)) {
-                AliProbe.log(recipeId, recipe, emiWidgets);
-            }
             stats.preNs += System.nanoTime() - t;
             long captureStart = System.nanoTime();
-            EmiRecipeGui.CardCapture card = EmiRecipeGui.capture(canvas, renderer, recipe, emiWidgets, stats, viewH);
+            boolean expectScene = (catFlags & EmiCardCats.INDIVIDUAL) != 0 || expectsScene(sinkCategory);
+            EmiRecipeGui.CardCapture card =
+                    EmiRecipeGui.capture(canvas, renderer, recipe, emiWidgets, stats, viewH, expectScene);
             captureNs = System.nanoTime() - captureStart;
             t = System.nanoTime();
             RecipeCardImage image = card.image();
             if (grid == null) {
+                if (expectScene && (card.scene() == null || !card.scene().hasScene())) {
+                    card = EmiRecipeGui.capture(canvas, renderer, recipe, emiWidgets, stats, viewH, true);
+                    image = card.image();
+                    stats.reshoots++;
+                }
                 queueScene(recipeId, sinkCategory, card.scene(), dumpWidgets);
+                if (expectScene && (card.scene() == null || !card.scene().hasScene())) {
+                    warnCap.warn("individual card {} finished without a scene", recipeId);
+                }
             }
             sinkAccept(recipeId, sinkCategory, deferred(image, dumpWidgets, recipeId));
             cardsQueued++;
@@ -304,7 +328,8 @@ final class EmiCardShots implements AutoCloseable {
             SceneCapture.Result scene,
             List<team.terrafirmagreg.exporter.data.recipe.capture.CardWidget> dumpWidgets) {
         long startNs = System.nanoTime();
-        List<SceneCapture.DrawnText> texts = scene.texts().isEmpty() ? List.of() : scene.texts();
+        List<SceneCapture.DrawnText> texts =
+                scene.texts().isEmpty() ? List.of() : CardSceneFilter.dedupeTexts(scene.texts());
         List<SceneCapture.DrawnItem> items = CardSceneFilter.outsideSlots(scene.items(), dumpWidgets);
         if (!scene.isEmpty()) {
             List<SceneCapture.DrawnEntity> entities =
@@ -397,6 +422,11 @@ final class EmiCardShots implements AutoCloseable {
             catPlans.put(category, plan);
         }
         return plan;
+    }
+
+    private boolean expectsScene(String category) {
+        return category != null
+                && ((EmiCardCats.flags(category) & EmiCardCats.INDIVIDUAL) != 0 || catPlan(category).individual);
     }
 
     private void sinkAccept(String id, String category, RecipeCardImage image) throws Exception {
@@ -524,9 +554,13 @@ final class EmiCardShots implements AutoCloseable {
             boolean external = EmiCardRender.containsExternalWidget(card.widgets());
             boolean sparse = baseNonBackground[i] < EmiCardPixels.MIN_NON_BACKGROUND;
             boolean hasScene = scene != null && scene.hasScene();
-            long window = external && (sparse || hasScene)
-                    ? EmiRecipeGui.EXTERNAL_WINDOW_MS + (hasScene ? EmiRecipeGui.EXTERNAL_WINDOW_MS : 0)
-                    : EmiRecipeGui.STABLE_WINDOW_MS;
+            boolean individual =
+                    card.category() != null && (EmiCardCats.flags(card.category()) & EmiCardCats.INDIVIDUAL) != 0;
+            long window = individual && external
+                    ? EmiRecipeGui.EXTERNAL_WINDOW_MS * 2
+                    : external && (sparse || hasScene)
+                            ? EmiRecipeGui.EXTERNAL_WINDOW_MS + (hasScene ? EmiRecipeGui.EXTERNAL_WINDOW_MS : 0)
+                            : EmiRecipeGui.STABLE_WINDOW_MS;
             deadlines[i] = now + window;
             chunkDeadline = Math.max(chunkDeadline, deadlines[i]);
         }
@@ -578,8 +612,12 @@ final class EmiCardShots implements AutoCloseable {
                         }
                     }
                 } else {
+                    boolean sceneReady = category == null
+                            || (EmiCardCats.flags(category) & EmiCardCats.INDIVIDUAL) == 0
+                            || (scene != null && scene.hasScene());
                     stable[i] = nonBackground[i] >= EmiCardPixels.MIN_NON_BACKGROUND
                                     && regionReady[i]
+                                    && sceneReady
                                     && !EmiRecipeGui.progressPending(scene)
                             ? stable[i] + 1
                             : 0;
@@ -856,7 +894,8 @@ final class EmiCardShots implements AutoCloseable {
                     card.recipe(),
                     card.widgets(),
                     stats,
-                    card.grid() != null ? card.grid().templateDisplayHeight() : null);
+                    card.grid() != null ? card.grid().templateDisplayHeight() : null,
+                    expectsScene(card.category()));
             if (card.grid() == null) {
                 queueScene(card.id(), card.category(), captured.scene(), card.dumpWidgets());
             }
@@ -914,6 +953,7 @@ final class EmiCardShots implements AutoCloseable {
             deferredAsync.clear();
             pendingBatch.clear();
             EmiConfig.maximumRecipeScreenHeight = savedMaxRecipeScreenHeight;
+            EmiViewportHeight.floor(0);
         }
         warnCap.done();
         renderer.close();

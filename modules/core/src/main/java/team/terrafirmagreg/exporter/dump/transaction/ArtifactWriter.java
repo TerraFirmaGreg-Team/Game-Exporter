@@ -29,13 +29,28 @@ public final class ArtifactWriter {
         Objects.requireNonNull(mediaType, "mediaType");
         Path target = renderer.render(address);
         String relative = renderer.relative(address);
-        Files.createDirectories(target.getParent());
-        Path temporary = Files.createTempFile(target.getParent(), "." + target.getFileName(), ".writing");
-        try {
-            Files.write(temporary, content);
-            DumpFiles.replace(temporary, target);
-        } finally {
-            Files.deleteIfExists(temporary);
+        for (int attempt = 0; ; attempt++) {
+            try {
+                Files.createDirectories(target.getParent());
+                Path temporary = Files.createTempFile(target.getParent(), "." + target.getFileName(), ".writing");
+                try {
+                    Files.write(temporary, content);
+                    DumpFiles.replace(temporary, target);
+                } finally {
+                    Files.deleteIfExists(temporary);
+                }
+                break;
+            } catch (IOException e) {
+                if (attempt >= 149) {
+                    throw e;
+                }
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw e;
+                }
+            }
         }
         ArtifactDescriptor descriptor =
                 new ArtifactDescriptor(address, relative, mediaType, content.length, DumpHashes.sha256(content));

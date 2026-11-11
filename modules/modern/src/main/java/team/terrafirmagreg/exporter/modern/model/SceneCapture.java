@@ -572,17 +572,32 @@ public class SceneCapture {
                     uniqueEntities.merge(entity.id(), entity, SceneCapture::mergeEntity);
                 }
             }
-            Map<DrawnTextKey, DrawnText> uniqueTexts = new LinkedHashMap<>();
+            Map<DrawnTextKey, List<DrawnText>> textGroups = new LinkedHashMap<>();
+            List<DrawnText> uniqueTexts = new ArrayList<>();
             if (drawnTexts != null) {
                 for (DrawnText text : drawnTexts) {
-                    uniqueTexts.putIfAbsent(new DrawnTextKey(text.x(), text.y(), text.color(), text.payload()), text);
+                    textGroups
+                            .computeIfAbsent(
+                                    new DrawnTextKey(0, text.y(), text.color(), text.payload()),
+                                    key -> new ArrayList<>())
+                            .add(text);
+                }
+                for (List<DrawnText> group : textGroups.values()) {
+                    // marquee/slide animations redraw the same text across frames at shifting x —
+                    // a run of 3+ copies keeps only the final-frame position; shorter runs are
+                    // distinct labels that happen to share text and row
+                    if (group.size() >= 3) {
+                        uniqueTexts.add(group.getLast());
+                    } else {
+                        uniqueTexts.addAll(group);
+                    }
                 }
             }
             return new Result(
                     Collections.unmodifiableMap(mergedBlocks),
                     unique.isEmpty() ? List.of() : List.copyOf(unique.values()),
                     uniqueEntities.isEmpty() ? List.of() : List.copyOf(uniqueEntities.values()),
-                    uniqueTexts.isEmpty() ? List.of() : List.copyOf(uniqueTexts.values()),
+                    uniqueTexts.isEmpty() ? List.of() : List.copyOf(uniqueTexts),
                     region,
                     sceneLevel);
         }

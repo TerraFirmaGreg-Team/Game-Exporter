@@ -70,7 +70,8 @@ public class DumpSchemas {
                 schema(GUIDE_BOOK, GuideBook.class),
                 schema(GUIDE_CATEGORY, GuideCategory.class),
                 schema("data/guides/entry", GUIDE_ENTRIES),
-                schema("keybinds", STRING_MAP));
+                schema("keybinds", STRING_MAP),
+                schema("names", STRING_MAP));
     }
 
     private static DumpSchema schema(String path, Type type) {

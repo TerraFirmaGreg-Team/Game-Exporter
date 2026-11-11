@@ -26,7 +26,6 @@ class EmiWidgetCapture {
                 recipe.addWidgets(holder);
             }
             List<CardWidget> out = new ArrayList<>();
-            boolean debug = AliProbe.enabled() && AliProbe.appliesTo(recipe);
             List<EmiWidgetProbe.Candidate> candidates = null;
             for (Widget widget : holder.widgets()) {
                 CardWidget row = serializeWidget(recipe, widget, holder.extras());
@@ -42,9 +41,6 @@ class EmiWidgetCapture {
                 }
                 List<CardWidget> probed =
                         candidates.isEmpty() ? List.of() : EmiWidgetProbe.probe(recipe, widget, candidates);
-                if (debug) {
-                    AliProbe.probe(recipe, widget, probed);
-                }
                 out.addAll(probed);
             }
             return new Result(List.copyOf(out), List.copyOf(holder.widgets()));

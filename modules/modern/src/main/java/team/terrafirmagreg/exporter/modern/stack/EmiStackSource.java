@@ -30,6 +30,7 @@ import team.terrafirmagreg.exporter.modern.EmiIndex;
 import team.terrafirmagreg.exporter.modern.EmiKeys;
 import team.terrafirmagreg.exporter.modern.ItemStackIds;
 import team.terrafirmagreg.exporter.modern.input.ForcedKeys;
+import team.terrafirmagreg.exporter.modern.recipe.TooltipGuard;
 import team.terrafirmagreg.exporter.modern.text.DumpTexts;
 import team.terrafirmagreg.exporter.util.ExportLog;
 
@@ -156,22 +157,22 @@ public final class EmiStackSource implements StackSource {
     }
 
     private static List<DumpText> itemTooltip(Minecraft client, ItemStack stack) {
-        List<DumpText> out = new ArrayList<>();
         try {
-            for (Component line :
-                    stack.getTooltipLines(client == null ? null : client.player, TooltipFlag.Default.NORMAL)) {
-                DumpText text = DumpTexts.ofStyled(line);
-                if (text != null) {
-                    out.add(text);
+            return TooltipGuard.call(() -> {
+                List<DumpText> out = new ArrayList<>();
+                for (Component line :
+                        stack.getTooltipLines(client == null ? null : client.player, TooltipFlag.Default.NORMAL)) {
+                    DumpText text = DumpTexts.ofStyled(line);
+                    if (text != null) {
+                        out.add(text);
+                    }
                 }
-            }
+                return out;
+            });
         } catch (Exception ignored) {
             DumpText text = DumpTexts.of(stack.getItem().getName(stack));
-            if (text != null) {
-                out.add(text);
-            }
+            return text == null ? List.of() : List.of(text);
         }
-        return out;
     }
 
     private static List<DumpText> textTooltip(EmiStack emi) {

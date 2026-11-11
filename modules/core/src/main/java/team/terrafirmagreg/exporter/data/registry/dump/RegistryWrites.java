@@ -101,7 +101,11 @@ class RegistryWrites {
         JsonNode sprite = row.get("sprite");
         if (sprite instanceof ObjectNode) {
             slim = DumpJson.mapper().createObjectNode();
-            slim.set("id", row.has("id") ? row.get("id") : DumpJson.mapper().getNodeFactory().stringNode(key));
+            slim.set(
+                    "id",
+                    row.has("id")
+                            ? row.get("id")
+                            : DumpJson.mapper().getNodeFactory().stringNode(key));
             JsonNode display = displayName(row.get("display"));
             if (display != null) {
                 slim.set("display", display);
@@ -128,7 +132,11 @@ class RegistryWrites {
             if (!slimVariants.isEmpty()) {
                 if (slim == null) {
                     slim = DumpJson.mapper().createObjectNode();
-                    slim.set("id", row.has("id") ? row.get("id") : DumpJson.mapper().getNodeFactory().stringNode(key));
+                    slim.set(
+                            "id",
+                            row.has("id")
+                                    ? row.get("id")
+                                    : DumpJson.mapper().getNodeFactory().stringNode(key));
                 }
                 slim.set("variants", slimVariants);
             }

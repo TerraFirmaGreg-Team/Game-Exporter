@@ -24,3 +24,4 @@ build/
 /modules/*/run/
 /modules/*/runs/
 
+/testdata

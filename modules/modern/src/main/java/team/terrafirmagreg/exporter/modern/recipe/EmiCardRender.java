@@ -26,7 +26,7 @@ import team.terrafirmagreg.exporter.util.ExportLog;
 
 @UtilityClass
 class EmiCardRender {
-    private static final int OFF_SCREEN_CURSOR = -1000;
+    static final int OFF_SCREEN_CURSOR = -1000;
     static final double GRID_DRIFT = 0.02;
     private static final ExportLog.WarnCap WIDGET_WARN = ExportLog.warnCapped(10);
 
@@ -295,6 +295,7 @@ class EmiCardRender {
         int neutralMouseX = displayW / 2 - 30;
         int originX = Math.round(graphics.pose().last().pose().m30());
         int originY = Math.round(graphics.pose().last().pose().m31());
+        boolean scrollIsolated = false;
         for (Widget widget : widgets) {
             boolean hideCursor = widget instanceof SlotWidget;
             try {
@@ -307,10 +308,18 @@ class EmiCardRender {
                             bounds.height(),
                             widget instanceof TextWidget);
                 }
-                if (widget instanceof AnimatedTextureWidget animated) {
+                Widget drawn = widget;
+                if (!scrollIsolated) {
+                    Widget isolated = AliScrollCompat.isolate(widget);
+                    if (isolated != widget) {
+                        drawn = isolated;
+                        scrollIsolated = true;
+                    }
+                }
+                if (drawn instanceof AnimatedTextureWidget animated) {
                     drawAnimatedStill(animated, bounds, context);
                 } else {
-                    widget.render(
+                    drawn.render(
                             graphics,
                             hideCursor ? OFF_SCREEN_CURSOR : neutralMouseX,
                             hideCursor ? OFF_SCREEN_CURSOR : 8,
@@ -327,7 +336,7 @@ class EmiCardRender {
         SceneCapture.bakeUnrendered(graphics, EmiRecipeGui.MARGIN);
     }
 
-    private static void drawAnimatedStill(AnimatedTextureWidget widget, Bounds bounds, EmiDrawContext context) {
+    static void drawAnimatedStill(AnimatedTextureWidget widget, Bounds bounds, EmiDrawContext context) {
         EmiTextureWidgetAccessor texture = (EmiTextureWidgetAccessor) widget;
         context.drawTexture(
                 texture.gameExporter$texture(),

@@ -40,6 +40,7 @@ import team.terrafirmagreg.exporter.engine.run.ExecutionOutputs;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
 import team.terrafirmagreg.exporter.engine.run.RunTasks;
 import team.terrafirmagreg.exporter.engine.spec.ComponentKey;
+import team.terrafirmagreg.exporter.engine.spec.ComponentKeys;
 import team.terrafirmagreg.exporter.engine.spec.ExportSpec;
 import team.terrafirmagreg.exporter.engine.spec.ProductId;
 import team.terrafirmagreg.exporter.util.ExportLog;
@@ -74,6 +75,15 @@ public class ManifestDump {
                 () -> GroupsDump.byNamespace(groups(outputs)).keySet());
         CompletableFuture<RecipeScan> scan = timed(tasks, nodes, "manifests.recipeScanMs", () -> recipeScan(outputs));
         CompletableFuture<List<String>> used = timed(tasks, nodes, "manifests.usedMs", () -> usedContent(outputs));
+        CompletableFuture<Void> names = timed(tasks, nodes, "manifests.namesMs", () -> {
+            NamesDump.writeNames(
+                    layout,
+                    RunTasks.await(used),
+                    request.resolvedComponents().contains(ComponentKeys.ASSETS_LANG) ? request.languages() : List.of(),
+                    outputs.findMerged(LangChannels.LANGS).orElse(Map.of()),
+                    outputs);
+            return null;
+        });
         CompletableFuture<Map<String, String>> quests =
                 timed(tasks, nodes, "manifests.questsMs", () -> questPointers(layout, catalog));
         CompletableFuture<Void> schemas = timed(tasks, nodes, "manifests.schemaMs", () -> {
@@ -103,6 +113,7 @@ public class ManifestDump {
         CompletableFuture<ReportFiles> stats = timed(tasks, nodes, "manifests.fileStatsMs", () -> {
             RunTasks.await(schemas);
             RunTasks.await(recipeIndex);
+            RunTasks.await(names);
             return ReportFileStats.of(layout.root(), tasks);
         });
         CompletableFuture<Void> report = timed(tasks, nodes, "manifests.reportMs", () -> {
@@ -111,6 +122,7 @@ public class ManifestDump {
         });
         DumpIndexes indexes =
                 new DumpIndexes(RunTasks.await(scan).types(), RunTasks.await(quests), RunTasks.await(used));
+        RunTasks.await(names);
         CatalogProjection projected = RunTasks.await(projection);
         RunTasks.await(report);
         manifests.stop();

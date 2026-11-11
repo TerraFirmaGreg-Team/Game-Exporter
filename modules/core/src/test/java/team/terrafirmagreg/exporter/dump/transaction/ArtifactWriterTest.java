@@ -52,6 +52,17 @@ class ArtifactWriterTest {
     }
 
     @Test
+    void dottedRootNameStillGetsJsonExtension() throws Exception {
+        TransactionState state = new TransactionState();
+        ArtifactCatalogBuilder catalog = new ArtifactCatalogBuilder();
+        ArtifactWriter writer = new ArtifactWriter(new ArtifactAddressRenderer(root), catalog, state);
+        ArtifactAddress address = new ArtifactAddress.Root("registry/items/tfc.icons");
+        ArtifactDescriptor descriptor = writer.write(address, json("a"), "application/json");
+        assertEquals("registry/items/tfc.icons.json", descriptor.relativePath());
+        assertArrayEquals(json("a"), Files.readAllBytes(root.resolve("registry/items/tfc.icons.json")));
+    }
+
+    @Test
     void discardRemovesFileAndCatalogEntry() throws Exception {
         TransactionState state = new TransactionState();
         ArtifactCatalogBuilder catalog = new ArtifactCatalogBuilder();

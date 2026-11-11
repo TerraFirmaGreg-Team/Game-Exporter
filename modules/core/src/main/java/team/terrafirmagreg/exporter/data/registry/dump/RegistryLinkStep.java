@@ -77,24 +77,20 @@ public class RegistryLinkStep {
         for (Map.Entry<String, ObjectNode> entry : roots.entrySet()) {
             String kind = entry.getKey();
             boolean icons = !EntryKind.ENTITY.folder().equals(kind);
-            for (Map.Entry<String, ObjectNode> shard : RegistryWrites.shards(entry.getValue()).entrySet()) {
+            for (Map.Entry<String, ObjectNode> shard :
+                    RegistryWrites.shards(entry.getValue()).entrySet()) {
                 String namespace = shard.getKey();
                 ObjectNode shardRoot = shard.getValue();
-                writes.add(scope.tasks()
-                        .run(() -> layout.writeJson(
-                                new ArtifactAddress.Root("registry/" + kind + "/" + namespace),
-                                EdgeTable.intern(shardRoot))));
-                if (icons) {
-                    writes.add(scope.tasks().run(() -> {
-                        ObjectNode iconsRoot = RegistryWrites.iconsRoot(shardRoot);
-                        if (iconsRoot != null) {
-                            layout.writeJson(
-                                    new ArtifactAddress.Root(
-                                            "registry/" + kind + "/" + namespace + ".icons"),
-                                    iconsRoot);
-                        }
-                    }));
-                }
+                ObjectNode iconsRoot = icons ? RegistryWrites.iconsRoot(shardRoot) : null;
+                writes.add(scope.tasks().run(() -> {
+                    layout.writeJson(
+                            new ArtifactAddress.Root("registry/" + kind + "/" + namespace),
+                            EdgeTable.intern(shardRoot));
+                    if (iconsRoot != null) {
+                        layout.writeJson(
+                                new ArtifactAddress.Root("registry/" + kind + "/" + namespace + ".icons"), iconsRoot);
+                    }
+                }));
             }
         }
         RunMetrics.Stopwatch drainWatch = scope.metrics().start("commitRegistry.drainMs");
@@ -106,10 +102,7 @@ public class RegistryLinkStep {
     }
 
     private static Map<String, Set<String>> namespaces(
-            Map<String, ObjectNode> roots,
-            List<TabEntry> tabs,
-            List<TagEntry> tags,
-            List<RecipeCategory> categories) {
+            Map<String, ObjectNode> roots, List<TabEntry> tabs, List<TagEntry> tags, List<RecipeCategory> categories) {
         Map<String, Set<String>> kinds = new TreeMap<>();
         for (Map.Entry<String, ObjectNode> root : roots.entrySet()) {
             for (Map.Entry<String, JsonNode> field : root.getValue().properties()) {

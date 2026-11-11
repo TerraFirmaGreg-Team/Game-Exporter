@@ -52,6 +52,18 @@ class EmiRecipeGui {
             CardStats stats,
             Integer viewH)
             throws Exception {
+        return capture(canvas, renderer, recipe, fallbackWidgets, stats, viewH, false);
+    }
+
+    static CardCapture capture(
+            Canvas canvas,
+            OffScreenRenderer renderer,
+            EmiRecipe recipe,
+            List<Widget> fallbackWidgets,
+            CardStats stats,
+            Integer viewH,
+            boolean expectScene)
+            throws Exception {
         AtomicReference<SceneCapture.Result> scene = new AtomicReference<>();
         int displayW = Math.max(1, recipe.getDisplayWidth());
         int displayH = Math.max(1, viewH != null ? viewH : recipe.getDisplayHeight());
@@ -65,17 +77,17 @@ class EmiRecipeGui {
             synchronized (WidgetTreeLock.LOCK) {
                 widgets = EmiCardRender.addWidgetsOnce(recipe);
                 if (EmiCardRender.containsExternalWidget(widgets)) {
-                    return captureWidgets(canvas, renderer, recipe, widgets, stats, scene, true, viewH);
+                    return captureWidgets(canvas, renderer, recipe, widgets, stats, scene, true, viewH, expectScene);
                 }
             }
-            return captureWidgets(canvas, renderer, recipe, widgets, stats, scene, false, viewH);
+            return captureWidgets(canvas, renderer, recipe, widgets, stats, scene, false, viewH, expectScene);
         }
         if (!EmiCardRender.containsExternalWidget(widgets)) {
-            return captureWidgets(canvas, renderer, recipe, widgets, stats, scene, false, viewH);
+            return captureWidgets(canvas, renderer, recipe, widgets, stats, scene, false, viewH, expectScene);
         }
         synchronized (WidgetTreeLock.LOCK) {
             List<Widget> rebuilt = EmiCardRender.addWidgetsOnce(recipe);
-            return captureWidgets(canvas, renderer, recipe, rebuilt, stats, scene, true, viewH);
+            return captureWidgets(canvas, renderer, recipe, rebuilt, stats, scene, true, viewH, expectScene);
         }
     }
 
@@ -87,7 +99,8 @@ class EmiRecipeGui {
             CardStats stats,
             AtomicReference<SceneCapture.Result> scene,
             boolean externalWidget,
-            Integer viewH)
+            Integer viewH,
+            boolean expectScene)
             throws Exception {
         int displayW = Math.max(1, recipe.getDisplayWidth());
         int displayH = Math.max(1, viewH != null ? viewH : recipe.getDisplayHeight());
@@ -99,12 +112,12 @@ class EmiRecipeGui {
         int[] argb = EmiCardRender.renderCard(
                         canvas, renderer, recipe, widgets, guiW, guiH, pixelW, pixelH, stats, scene, true, viewH)
                 .argb();
-        if (!externalWidget && EmiCardCats.sync(category) && !progressPending(scene.get())) {
+        if (!expectScene && !externalWidget && EmiCardCats.sync(category) && !progressPending(scene.get())) {
             return new CardCapture(new RecipeCardImage(argb, pixelW, pixelH), scene.get());
         }
         boolean animated = EmiCardCats.animated(category);
         boolean sparse = EmiCardPixels.mostlyBackground(argb);
-        boolean mayMaterialize = externalWidget || sparse;
+        boolean mayMaterialize = externalWidget || sparse || expectScene;
         if (!mayMaterialize && !animated) {
             EmiCardCats.markSyncProbe(category);
             EmiCardRender.verifyGrid(
@@ -145,7 +158,9 @@ class EmiRecipeGui {
                     || (!async
                             && !EmiCardPixels.mostlyBackground(next)
                             && Arrays.equals(argb, next)
-                            && sceneRegionPx == null)) {
+                            && sceneRegionPx == null
+                            && (!expectScene
+                                    || (scene.get() != null && scene.get().hasScene())))) {
                 if (animated) {
                     stats.animated++;
                 } else {
@@ -157,11 +172,14 @@ class EmiRecipeGui {
                 argb = next;
             } else {
                 stats.waits++;
+                boolean individual = expectScene || (EmiCardCats.flags(category) & EmiCardCats.INDIVIDUAL) != 0;
                 double baseNonBackground = EmiCardPixels.nonBackgroundFraction(argb);
                 long deadline = System.currentTimeMillis()
-                        + (externalWidget && (sparse || hasScene)
-                                ? EXTERNAL_WINDOW_MS + (hasScene ? EXTERNAL_WINDOW_MS : 0)
-                                : STABLE_WINDOW_MS);
+                        + (individual && externalWidget
+                                ? EXTERNAL_WINDOW_MS * 2
+                                : externalWidget && (sparse || hasScene)
+                                        ? EXTERNAL_WINDOW_MS + (hasScene ? EXTERNAL_WINDOW_MS : 0)
+                                        : STABLE_WINDOW_MS);
                 int stable = 0;
                 boolean regionReady = sceneRegionPx == null;
                 argb = next;
@@ -188,8 +206,11 @@ class EmiRecipeGui {
                     regionReady = sceneRegionPx == null
                             || EmiCardPixels.regionFill(cur, pixelW, pixelH, sceneRegionPx)
                                     >= EmiCardPixels.MIN_NON_BACKGROUND;
+                    boolean sceneReady =
+                            !individual || (scene.get() != null && scene.get().hasScene());
                     stable = curNonBackground >= EmiCardPixels.MIN_NON_BACKGROUND
                                     && regionReady
+                                    && sceneReady
                                     && !progressPending(scene.get())
                                     && Arrays.equals(argb, cur)
                             ? stable + 1

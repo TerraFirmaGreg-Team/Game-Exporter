@@ -40,6 +40,32 @@ class CardSceneFilter {
         return kept;
     }
 
+    static List<SceneCapture.DrawnText> dedupeTexts(List<SceneCapture.DrawnText> texts) {
+        if (texts.size() < 2) {
+            return texts;
+        }
+        List<SceneCapture.DrawnText> out = new ArrayList<>(texts.size());
+        for (int i = 0; i < texts.size(); i++) {
+            SceneCapture.DrawnText a = texts.get(i);
+            boolean shadowed = false;
+            for (int j = i + 1; j < texts.size(); j++) {
+                SceneCapture.DrawnText b = texts.get(j);
+                if (a.y() == b.y()
+                        && a.color() == b.color()
+                        && a.payload().equals(b.payload())
+                        && a.x() < b.x() + b.w()
+                        && b.x() < a.x() + a.w()) {
+                    shadowed = true;
+                    break;
+                }
+            }
+            if (!shadowed) {
+                out.add(a);
+            }
+        }
+        return out;
+    }
+
     private static boolean insideInteractiveSlot(int px, int py, List<CardWidget> dumpWidgets) {
         for (var slot : dumpWidgets) {
             if (slot.interaction() == null) {

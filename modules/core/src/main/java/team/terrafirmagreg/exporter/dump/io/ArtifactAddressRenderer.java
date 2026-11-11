@@ -81,7 +81,7 @@ public final class ArtifactAddressRenderer {
         String path =
                 switch (address) {
                     case ArtifactAddress.Manifest ignored -> DumpLayout.MANIFEST;
-                    case ArtifactAddress.Root root -> metaPath(root.canonicalId());
+                    case ArtifactAddress.Root root -> jsonPath(root.canonicalId());
                     case Asset asset -> assetPath(asset);
                     case Data data -> dataPath(data);
                     case ArtifactAddress.Meta meta -> "meta/" + metaPath(meta.canonicalId());

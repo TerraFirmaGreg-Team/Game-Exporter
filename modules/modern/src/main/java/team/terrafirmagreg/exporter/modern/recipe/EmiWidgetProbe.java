@@ -58,7 +58,9 @@ class EmiWidgetProbe {
         List<Sig>[] sigs = (List<Sig>[]) new List<?>[gw * gh];
         for (int gy = 0; gy < gh; gy++) {
             for (int gx = 0; gx < gw; gx++) {
-                List<ClientTooltipComponent> tooltip = widget.getTooltip(vb.x() + gx * step, vb.y() + gy * step);
+                int px = vb.x() + gx * step;
+                int py = vb.y() + gy * step;
+                List<ClientTooltipComponent> tooltip = TooltipGuard.call(() -> widget.getTooltip(px, py));
                 tips[gy * gw + gx] = tooltip;
                 hits[gy * gw + gx] = tooltip != null && !tooltip.isEmpty();
             }
@@ -133,7 +135,8 @@ class EmiWidgetProbe {
         record Match(ProbeRegion region, int candidate, int score) {}
         List<Match> matches = new ArrayList<>();
         for (ProbeRegion region : regions) {
-            List<Sig> rsig = signature(widget.getTooltip(region.x() + region.w() / 2, region.y() + region.h() / 2));
+            List<Sig> rsig = signature(TooltipGuard.call(
+                    () -> widget.getTooltip(region.x() + region.w() / 2, region.y() + region.h() / 2)));
             if (rsig.isEmpty()) {
                 continue;
             }
@@ -203,7 +206,7 @@ class EmiWidgetProbe {
             if (stack == null || stack.isEmpty() || EmiRecipeSource.stackId(stack) == null) {
                 continue;
             }
-            List<Sig> sig = signature(stack.getTooltip());
+            List<Sig> sig = signature(TooltipGuard.call(stack::getTooltip));
             if (!sig.isEmpty()) {
                 out.add(new Candidate(stack, role, sig));
             }
@@ -245,7 +248,9 @@ class EmiWidgetProbe {
     private static boolean anyTooltip(Widget widget, Bounds vb, int step) {
         for (int y = vb.y(); y < vb.y() + vb.height(); y += step) {
             for (int x = vb.x(); x < vb.x() + vb.width(); x += step) {
-                if (!widget.getTooltip(x, y).isEmpty()) {
+                int px = x;
+                int py = y;
+                if (!TooltipGuard.call(() -> widget.getTooltip(px, py)).isEmpty()) {
                     return true;
                 }
             }

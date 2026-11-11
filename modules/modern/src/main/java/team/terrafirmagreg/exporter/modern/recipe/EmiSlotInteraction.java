@@ -10,6 +10,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import lombok.experimental.UtilityClass;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.item.SpawnEggItem;
+import net.minecraftforge.registries.ForgeRegistries;
+import team.terrafirmagreg.exporter.contract.ref.ReferenceKind;
 import team.terrafirmagreg.exporter.contract.ref.TaggedReference;
 import team.terrafirmagreg.exporter.data.recipe.capture.Interaction;
 
@@ -45,6 +50,18 @@ class EmiSlotInteraction {
         List<TaggedReference> out = new ArrayList<>();
         Set<String> seen = new HashSet<>();
         for (EmiStack stack : stacks) {
+            EntityType<?> entityType = stack.getKeyOfType(EntityType.class);
+            if (entityType != null) {
+                SpawnEggItem egg = SpawnEggItem.byId(entityType);
+                ResourceLocation eggId = egg == null ? null : ForgeRegistries.ITEMS.getKey(egg);
+                if (eggId != null && seen.add("item:" + eggId)) {
+                    out.add(new TaggedReference(ReferenceKind.ITEM, eggId.toString()));
+                }
+                if (out.size() >= ALTERNATIVE_LIMIT) {
+                    break;
+                }
+                continue;
+            }
             String altId = EmiRecipeSource.stackId(stack);
             if (altId == null || altId.equals(primaryId) || !seen.add(altId)) {
                 continue;

@@ -1,9 +1,16 @@
 {
     "package": "team.terrafirmagreg.exporter.modern.mixin",
     "minVersion": "0.8",
+    "plugin": "team.terrafirmagreg.exporter.modern.mixin.CompatMixinPlugin",
     "injectors": {"defaultRequire": 1},
     "compatibilityLevel": "JAVA_17",
     "client": [
+        "AliScrollWidgetAccessor",
+        "AciScrollWidgetAccessor",
+        "AliBlockSlotAccessor",
+        "AliEntityLootAccessor",
+        "AliLootSlotAccessor",
+        "AliLootOptionAccessor",
         "InputConstantsMixin",
         "FallbackResourceManagerMixin",
         "SceneBlockCaptureMixin",
@@ -23,7 +30,8 @@
         "EmiGeneratedSlotMixin",
         "ClientTextTooltipAccessor",
         "UtilFreezeMixin",
-        "LevelFreezeMixin"
+        "LevelFreezeMixin",
+        "AliLootHeightMixin"
     ],
     "refmap": "exporter.mixins.refmap.json",
     "required": true

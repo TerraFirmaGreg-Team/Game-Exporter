@@ -32,7 +32,8 @@ class DumpSchemasTest {
             "data/guides/category",
             "data/guides/entry",
             "lang",
-            "keybinds");
+            "keybinds",
+            "names");
 
     @Test
     void coversEveryDocumentedSchemaPath() {
