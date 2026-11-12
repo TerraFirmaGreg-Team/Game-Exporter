@@ -2,6 +2,7 @@ package team.terrafirmagreg.exporter.modern.stack;
 
 import dev.emi.emi.api.EmiApi;
 import dev.emi.emi.api.recipe.EmiRecipe;
+import dev.emi.emi.EmiRenderHelper;
 import dev.emi.emi.api.recipe.EmiRecipeManager;
 import dev.emi.emi.api.stack.EmiIngredient;
 import dev.emi.emi.api.stack.EmiStack;
@@ -12,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
@@ -30,6 +32,7 @@ import team.terrafirmagreg.exporter.modern.EmiIndex;
 import team.terrafirmagreg.exporter.modern.EmiKeys;
 import team.terrafirmagreg.exporter.modern.ItemStackIds;
 import team.terrafirmagreg.exporter.modern.input.ForcedKeys;
+import team.terrafirmagreg.exporter.modern.mixin.ClientTextTooltipAccessor;
 import team.terrafirmagreg.exporter.modern.recipe.TooltipGuard;
 import team.terrafirmagreg.exporter.modern.text.DumpTexts;
 import team.terrafirmagreg.exporter.util.ExportLog;
@@ -123,12 +126,40 @@ public final class EmiStackSource implements StackSource {
         }
         String fluidId = loc.toString();
         String id = StackId.format(fluidId, nbt(emi));
-        return FluidStackEntry.of(id, fluidId, textTooltip(emi), null);
+        return FluidStackEntry.of(id, fluidId, fluidTooltip(emi), null);
     }
 
     private static String nbt(EmiStack emi) {
         var tag = emi.getNbt();
         return tag == null || tag.isEmpty() ? null : tag.toString();
+    }
+
+    private static List<DumpText> fluidTooltip(EmiStack emi) {
+        return TooltipGuard.call(() -> {
+            String amountText;
+            try {
+                Component amount = EmiRenderHelper.getAmountText(emi);
+                amountText = amount == null ? null : amount.getString();
+            } catch (Throwable t) {
+                amountText = null;
+            }
+            List<DumpText> out = new ArrayList<>();
+            for (ClientTooltipComponent component : emi.getTooltip()) {
+                if (!(component instanceof ClientTextTooltipAccessor accessor)) {
+                    continue;
+                }
+                DumpText text = DumpTexts.sequence(accessor.gameExporter$text());
+                if (text == null) {
+                    continue;
+                }
+                String plain = DumpTexts.plain(text);
+                if (plain.isEmpty() || plain.equals(amountText)) {
+                    continue;
+                }
+                out.add(text);
+            }
+            return out;
+        });
     }
 
     private static final Map<String, Integer> MODIFIER_KEYS = new LinkedHashMap<>(3);
