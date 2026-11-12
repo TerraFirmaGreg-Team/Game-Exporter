@@ -62,7 +62,7 @@ public class StorageSync {
             if (object) {
                 String ext = DumpFiles.extension(rel);
                 String suffix = ext.isEmpty() ? "" : "." + ext;
-                gzip = rel.endsWith(".json");
+                gzip = rel.endsWith(".json") || rel.endsWith(".ndjson");
                 if (gzip) {
                     suffix += ".gz";
                 }
@@ -138,7 +138,7 @@ public class StorageSync {
     }
 
     private static boolean gzipInline(String rel) {
-        return rel.endsWith(".json") && !rel.equals("manifest.json");
+        return (rel.endsWith(".json") || rel.endsWith(".ndjson")) && !rel.equals("manifest.json");
     }
 
     private static byte[] gzip(byte[] raw) throws IOException {
@@ -155,6 +155,9 @@ public class StorageSync {
         }
         if (key.endsWith(".glb")) {
             return "model/gltf-binary";
+        }
+        if (key.endsWith(".ndjson") || key.endsWith(".ndjson.gz")) {
+            return "application/x-ndjson";
         }
         return "application/json";
     }

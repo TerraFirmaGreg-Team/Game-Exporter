@@ -8,6 +8,7 @@ import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
 import team.terrafirmagreg.exporter.dump.io.ArtifactAddressRenderer;
 import team.terrafirmagreg.exporter.dump.io.DumpWriter;
 import team.terrafirmagreg.exporter.dump.transaction.ArtifactWriter;
+import tools.jackson.databind.node.ObjectNode;
 
 public record DumpLayout(Path root, DumpWriter writer, ArtifactWriter artifacts) {
     public static final String MANIFEST = "manifest.json";
@@ -42,6 +43,10 @@ public record DumpLayout(Path root, DumpWriter writer, ArtifactWriter artifacts)
 
     public void writeJson(ArtifactAddress address, Object value) throws IOException {
         write(address, writer.toJsonBytes(value));
+    }
+
+    public void writeNdjson(ArtifactAddress address, ObjectNode root) throws IOException {
+        write(address, writer.toNdjsonBytes(root));
     }
 
     public void discard(ArtifactAddress address) throws IOException {

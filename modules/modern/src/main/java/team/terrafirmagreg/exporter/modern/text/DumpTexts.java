@@ -2,6 +2,7 @@ package team.terrafirmagreg.exporter.modern.text;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import lombok.experimental.UtilityClass;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
@@ -127,6 +128,14 @@ public class DumpTexts {
         return out;
     }
 
+    private static final Map<Integer, Character> LEGACY_COLORS = Map.ofEntries(
+            Map.entry(0x000000, '0'), Map.entry(0x0000AA, '1'), Map.entry(0x00AA00, '2'),
+            Map.entry(0x00AAAA, '3'), Map.entry(0xAA0000, '4'), Map.entry(0xAA00AA, '5'),
+            Map.entry(0xFFAA00, '6'), Map.entry(0xAAAAAA, '7'), Map.entry(0x555555, '8'),
+            Map.entry(0x5555FF, '9'), Map.entry(0x55FF55, 'a'), Map.entry(0x55FFFF, 'b'),
+            Map.entry(0xFF5555, 'c'), Map.entry(0xFF55FF, 'd'), Map.entry(0xFFFF55, 'e'),
+            Map.entry(0xFFFFFF, 'f'));
+
     private static String styleCodes(Style style) {
         if (style == null || style.isEmpty()) {
             return "";
@@ -134,10 +143,16 @@ public class DumpTexts {
         StringBuilder out = new StringBuilder();
         TextColor color = style.getColor();
         if (color != null) {
-            out.append('§').append('x');
-            String hex = "%06x".formatted(color.getValue() & 0xFFFFFF);
-            for (int i = 0; i < hex.length(); i++) {
-                out.append('§').append(hex.charAt(i));
+            int rgb = color.getValue() & 0xFFFFFF;
+            Character legacy = LEGACY_COLORS.get(rgb);
+            if (legacy != null) {
+                out.append('§').append(legacy.charValue());
+            } else {
+                out.append('§').append('x');
+                String hex = "%06x".formatted(rgb);
+                for (int i = 0; i < hex.length(); i++) {
+                    out.append('§').append(hex.charAt(i));
+                }
             }
         }
         if (style.isBold()) {

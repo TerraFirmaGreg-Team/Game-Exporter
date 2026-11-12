@@ -76,19 +76,27 @@ public class RegistryLinkStep {
         linkWatch.stop();
         for (Map.Entry<String, ObjectNode> entry : roots.entrySet()) {
             String kind = entry.getKey();
-            boolean icons = !EntryKind.ENTITY.folder().equals(kind);
+            boolean entity = EntryKind.ENTITY.folder().equals(kind);
             for (Map.Entry<String, ObjectNode> shard :
                     RegistryWrites.shards(entry.getValue()).entrySet()) {
                 String namespace = shard.getKey();
                 ObjectNode shardRoot = shard.getValue();
-                ObjectNode iconsRoot = icons ? RegistryWrites.iconsRoot(shardRoot) : null;
+                ObjectNode iconsRoot = entity ? null : RegistryWrites.iconsRoot(shardRoot);
+                ObjectNode tooltipsRoot = RegistryWrites.tooltipsRoot(shardRoot);
+                ObjectNode usesRoot = RegistryWrites.usesRoot(shardRoot);
+                RegistryWrites.stripHeavy(shardRoot, entity);
+                String base = "registry/" + kind + "/" + namespace;
                 writes.add(scope.tasks().run(() -> {
-                    layout.writeJson(
-                            new ArtifactAddress.Root("registry/" + kind + "/" + namespace),
-                            EdgeTable.intern(shardRoot));
+                    layout.writeNdjson(new ArtifactAddress.Root(base + ".ndjson"), shardRoot);
                     if (iconsRoot != null) {
-                        layout.writeJson(
-                                new ArtifactAddress.Root("registry/" + kind + "/" + namespace + ".icons"), iconsRoot);
+                        layout.writeNdjson(new ArtifactAddress.Root(base + ".icons.ndjson"), iconsRoot);
+                    }
+                    if (tooltipsRoot != null) {
+                        layout.writeNdjson(new ArtifactAddress.Root(base + ".tooltips.ndjson"), tooltipsRoot);
+                    }
+                    if (usesRoot != null) {
+                        layout.writeNdjson(
+                                new ArtifactAddress.Root(base + ".uses.ndjson"), EdgeTable.intern(usesRoot));
                     }
                 }));
             }

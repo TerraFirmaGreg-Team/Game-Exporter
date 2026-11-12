@@ -40,7 +40,7 @@ public final class ArtifactAddressRenderer {
     }
 
     private static String jsonPath(String value) {
-        return value.endsWith(".json") ? value : value + ".json";
+        return value.endsWith(".json") || value.endsWith(".ndjson") ? value : value + ".json";
     }
 
     private static String metaPath(String value) {

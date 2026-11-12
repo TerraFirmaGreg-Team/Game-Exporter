@@ -97,50 +97,141 @@ class RegistryWrites {
     }
 
     private static ObjectNode iconRow(ObjectNode row, String key) {
-        ObjectNode slim = null;
-        JsonNode sprite = row.get("sprite");
-        if (sprite instanceof ObjectNode) {
-            slim = DumpJson.mapper().createObjectNode();
-            slim.set(
-                    "id",
-                    row.has("id")
-                            ? row.get("id")
-                            : DumpJson.mapper().getNodeFactory().stringNode(key));
-            JsonNode display = displayName(row.get("display"));
+        ObjectNode slim = DumpJson.mapper().createObjectNode();
+        JsonNode display = displayName(row.get("display"));
+        if (display != null) {
+            slim.set("display", display);
+        }
+        if (row.get("sprite") instanceof ObjectNode sprite) {
+            slim.set("sprite", sprite);
+        }
+        ArrayNode slimVariants = slimVariants(row.get("variants"), false);
+        if (!slimVariants.isEmpty()) {
+            slim.set("variants", slimVariants);
+        }
+        return slim.isEmpty() ? null : withId(slim, row, key);
+    }
+
+    private static ArrayNode slimVariants(JsonNode variantsNode, boolean tooltipOnly) {
+        ArrayNode out = DumpJson.mapper().createArrayNode();
+        if (!(variantsNode instanceof ArrayNode variants)) {
+            return out;
+        }
+        for (JsonNode raw : variants) {
+            if (!(raw instanceof ObjectNode variant)) {
+                continue;
+            }
+            ObjectNode slimVariant = DumpJson.mapper().createObjectNode();
+            if (variant.hasNonNull("tag")) {
+                slimVariant.set("tag", variant.get("tag"));
+            }
+            JsonNode display =
+                    tooltipOnly ? tooltipPart(variant.get("display")) : displayName(variant.get("display"));
+            if (display != null) {
+                slimVariant.set("display", display);
+            }
+            if (!tooltipOnly && variant.get("sprite") instanceof ObjectNode sprite) {
+                slimVariant.set("sprite", sprite);
+            }
+            if (!slimVariant.isEmpty()) {
+                out.add(slimVariant);
+            }
+        }
+        return out;
+    }
+
+    static ObjectNode tooltipsRoot(ObjectNode shard) {
+        ObjectNode out = DumpJson.mapper().createObjectNode();
+        for (Map.Entry<String, JsonNode> field : shard.properties()) {
+            if (!(field.getValue() instanceof ObjectNode row)) {
+                continue;
+            }
+            ObjectNode slim = DumpJson.mapper().createObjectNode();
+            JsonNode display = tooltipPart(row.get("display"));
             if (display != null) {
                 slim.set("display", display);
             }
-            slim.set("sprite", sprite);
-        }
-        if (row.get("variants") instanceof ArrayNode variants) {
-            ArrayNode slimVariants = DumpJson.mapper().createArrayNode();
-            for (JsonNode raw : variants) {
-                if (!(raw instanceof ObjectNode variant) || !(variant.get("sprite") instanceof ObjectNode)) {
-                    continue;
-                }
-                ObjectNode slimVariant = DumpJson.mapper().createObjectNode();
-                if (variant.hasNonNull("tag")) {
-                    slimVariant.set("tag", variant.get("tag"));
-                }
-                JsonNode display = displayName(variant.get("display"));
-                if (display != null) {
-                    slimVariant.set("display", display);
-                }
-                slimVariant.set("sprite", variant.get("sprite"));
-                slimVariants.add(slimVariant);
+            ArrayNode variants = slimVariants(row.get("variants"), true);
+            if (!variants.isEmpty()) {
+                slim.set("variants", variants);
             }
-            if (!slimVariants.isEmpty()) {
-                if (slim == null) {
-                    slim = DumpJson.mapper().createObjectNode();
-                    slim.set(
-                            "id",
-                            row.has("id")
-                                    ? row.get("id")
-                                    : DumpJson.mapper().getNodeFactory().stringNode(key));
-                }
-                slim.set("variants", slimVariants);
+            if (!slim.isEmpty()) {
+                out.set(field.getKey(), withId(slim, row, field.getKey()));
             }
         }
+        return out.isEmpty() ? null : out;
+    }
+
+    private static JsonNode tooltipPart(JsonNode display) {
+        if (!(display instanceof ObjectNode object)) {
+            return null;
+        }
+        ObjectNode slim = DumpJson.mapper().createObjectNode();
+        for (String field : List.of("tooltip", "tooltipMods")) {
+            JsonNode value = object.get(field);
+            if (value != null && !value.isNull() && !value.isEmpty()) {
+                slim.set(field, value);
+            }
+        }
+        return slim.isEmpty() ? null : slim;
+    }
+
+    static ObjectNode usesRoot(ObjectNode shard) {
+        ObjectNode out = DumpJson.mapper().createObjectNode();
+        for (Map.Entry<String, JsonNode> field : shard.properties()) {
+            if (!(field.getValue() instanceof ObjectNode row)) {
+                continue;
+            }
+            ObjectNode slim = DumpJson.mapper().createObjectNode();
+            for (String name : List.of("usedBy", "producedBy", "tags")) {
+                JsonNode value = row.get(name);
+                if (value != null && !value.isNull() && !value.isEmpty()) {
+                    slim.set(name, value);
+                }
+            }
+            if (!slim.isEmpty()) {
+                out.set(field.getKey(), withId(slim, row, field.getKey()));
+            }
+        }
+        return out.isEmpty() ? null : out;
+    }
+
+    static void stripHeavy(ObjectNode shard, boolean entity) {
+        for (Map.Entry<String, JsonNode> field : shard.properties()) {
+            if (!(field.getValue() instanceof ObjectNode row)) {
+                continue;
+            }
+            row.remove(List.of("usedBy", "producedBy", "tags"));
+            if (!entity) {
+                row.remove(List.of("display", "sprite", "variants"));
+            } else {
+                if (row.get("display") instanceof ObjectNode display) {
+                    display.remove(List.of("tooltip", "tooltipMods"));
+                    if (display.isEmpty()) {
+                        row.remove("display");
+                    }
+                }
+            }
+            if (entity && row.get("variants") instanceof ArrayNode variants) {
+                for (JsonNode raw : variants) {
+                    if (raw instanceof ObjectNode variant
+                            && variant.get("display") instanceof ObjectNode display) {
+                        display.remove(List.of("tooltip", "tooltipMods"));
+                        if (display.isEmpty()) {
+                            variant.remove("display");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private static ObjectNode withId(ObjectNode slim, ObjectNode row, String key) {
+        slim.set(
+                "id",
+                row.has("id")
+                        ? row.get("id")
+                        : DumpJson.mapper().getNodeFactory().stringNode(key));
         return slim;
     }
 
