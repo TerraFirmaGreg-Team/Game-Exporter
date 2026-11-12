@@ -164,15 +164,7 @@ public class NamesDump {
         if (ref == null || ref.id() == null) {
             return;
         }
-        String id = ref.id().id();
-        JsonNode tag = ref.tag();
-        if (tag != null) {
-            JsonNode canonical = SnbtToJson.canonicalize(tag);
-            if (canonical != null && canonical.isObject() && !canonical.isEmpty()) {
-                id = id + CanonicalSnbt.write(canonical);
-            }
-        }
-        out.add(id);
+        out.add(ref.key() != null ? ref.key() : ref.id().id());
     }
 
     private static void emitRequest(Map<String, NameTarget> names, Map<String, StackRow> rows, String request) {

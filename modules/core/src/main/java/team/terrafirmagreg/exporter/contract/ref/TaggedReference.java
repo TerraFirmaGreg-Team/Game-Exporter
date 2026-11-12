@@ -4,13 +4,15 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.Objects;
 import team.terrafirmagreg.exporter.contract.id.ResourceId;
 import team.terrafirmagreg.exporter.contract.id.StackId;
+import team.terrafirmagreg.exporter.util.snbt.CanonicalSnbt;
 import team.terrafirmagreg.exporter.util.snbt.SnbtToJson;
 import tools.jackson.databind.JsonNode;
 
 public record TaggedReference(
         ReferenceKind kind,
         ResourceId id,
-        @JsonInclude(JsonInclude.Include.NON_NULL) JsonNode tag) {
+        @JsonInclude(JsonInclude.Include.NON_NULL) JsonNode tag,
+        @JsonInclude(JsonInclude.Include.NON_NULL) String key) {
     public TaggedReference {
         Objects.requireNonNull(kind, "kind");
         Objects.requireNonNull(id, "id");
@@ -19,7 +21,14 @@ public record TaggedReference(
                 throw new IllegalArgumentException("Only item/fluid references may carry a tag");
             }
             tag = new StackIdentity(kind, id, tag).tag();
+            if (key == null) {
+                key = id.id() + CanonicalSnbt.write(tag);
+            }
         }
+    }
+
+    public TaggedReference(ReferenceKind kind, ResourceId id, JsonNode tag) {
+        this(kind, id, tag, null);
     }
 
     public TaggedReference(ReferenceKind kind, String id) {

@@ -20,6 +20,20 @@ class TaggedReferenceTest {
     void stackParsesBareId() {
         TaggedReference ref = TaggedReference.stack(ReferenceKind.FLUID, "minecraft:water");
         assertNull(ref.tag());
+        assertNull(ref.key());
+    }
+
+    @Test
+    void keyKeepsLargeLongDigits() {
+        TaggedReference ref =
+                TaggedReference.stack(ReferenceKind.ITEM, "gtceu:max_battery{Charge:9223372036854775807}");
+        assertEquals("gtceu:max_battery{Charge:9223372036854775807}", ref.key());
+    }
+
+    @Test
+    void keyCanonicalizesTag() {
+        TaggedReference ref = TaggedReference.stack(ReferenceKind.ITEM, "minecraft:stone{B:2,A:1}");
+        assertEquals("minecraft:stone{A:1,B:2}", ref.key());
     }
 
     @Test
