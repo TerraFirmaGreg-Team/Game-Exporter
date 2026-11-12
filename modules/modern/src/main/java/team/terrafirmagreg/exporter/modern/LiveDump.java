@@ -1,6 +1,7 @@
 package team.terrafirmagreg.exporter.modern;
 
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import net.minecraft.client.Minecraft;
@@ -8,6 +9,7 @@ import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen;
 import net.minecraft.network.chat.Component;
 import team.terrafirmagreg.exporter.assets.lang.LangComponent;
+import team.terrafirmagreg.exporter.assets.lang.dump.LangProjectionStep;
 import team.terrafirmagreg.exporter.assets.model.ModelComponent;
 import team.terrafirmagreg.exporter.assets.texture.TextureComponent;
 import team.terrafirmagreg.exporter.contract.id.EntryKind;
@@ -75,7 +77,11 @@ public final class LiveDump extends LiveExport<Minecraft> {
         EmiRecipeSource recipes = new EmiRecipeSource();
         EmiStackSource stacks = new EmiStackSource();
         return new ExportPipeline("modern", "1.20.1")
-                .epilogue(RegistryLinkStep::apply)
+                .epilogue((layout, outputs, scope) -> {
+                    Map<String, Set<String>> kinds = RegistryLinkStep.apply(layout, outputs, scope);
+                    LangProjectionStep.apply(layout, outputs, scope);
+                    return kinds;
+                })
                 .add(new RegistryComponent(EntryKind.ITEM)
                         .addSource(new BuiltInRegistrySource(EntryKind.ITEM))
                         .addStackSource(stacks))

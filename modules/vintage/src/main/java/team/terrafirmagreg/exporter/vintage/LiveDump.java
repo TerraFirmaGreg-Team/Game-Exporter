@@ -1,6 +1,7 @@
 package team.terrafirmagreg.exporter.vintage;
 
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import net.minecraft.client.Minecraft;
@@ -9,6 +10,7 @@ import net.minecraft.client.gui.GuiWorldSelection;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraftforge.fml.common.Loader;
 import team.terrafirmagreg.exporter.assets.lang.LangComponent;
+import team.terrafirmagreg.exporter.assets.lang.dump.LangProjectionStep;
 import team.terrafirmagreg.exporter.assets.texture.TextureComponent;
 import team.terrafirmagreg.exporter.contract.id.EntryKind;
 import team.terrafirmagreg.exporter.data.category.CategoryComponent;
@@ -71,7 +73,11 @@ public final class LiveDump extends LiveExport<Minecraft> {
         JeiRecipeSource recipes = new JeiRecipeSource();
         JeiStackSource stacks = new JeiStackSource();
         return new ExportPipeline("vintage", "1.12.2")
-                .epilogue(RegistryLinkStep::apply)
+                .epilogue((layout, outputs, scope) -> {
+                    Map<String, Set<String>> kinds = RegistryLinkStep.apply(layout, outputs, scope);
+                    LangProjectionStep.apply(layout, outputs, scope);
+                    return kinds;
+                })
                 .add(new RegistryComponent(EntryKind.ITEM)
                         .addSource(new ForgeRegistrySource(EntryKind.ITEM))
                         .addStackSource(stacks))

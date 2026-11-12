@@ -22,6 +22,7 @@ import team.terrafirmagreg.exporter.data.registry.RegistryChannels;
 import team.terrafirmagreg.exporter.dump.DataPaths;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
 import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
+import team.terrafirmagreg.exporter.dump.io.DumpJson;
 import team.terrafirmagreg.exporter.engine.report.RunMetrics;
 import team.terrafirmagreg.exporter.engine.run.ExecutionOutputs;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
@@ -77,6 +78,8 @@ public class RegistryLinkStep {
         for (Map.Entry<String, ObjectNode> entry : roots.entrySet()) {
             String kind = entry.getKey();
             boolean entity = EntryKind.ENTITY.folder().equals(kind);
+            ObjectNode mergedShard = DumpJson.mapper().createObjectNode();
+            ObjectNode mergedIcons = entity ? null : DumpJson.mapper().createObjectNode();
             for (Map.Entry<String, ObjectNode> shard :
                     RegistryWrites.shards(entry.getValue()).entrySet()) {
                 String namespace = shard.getKey();
@@ -85,6 +88,10 @@ public class RegistryLinkStep {
                 ObjectNode tooltipsRoot = RegistryWrites.tooltipsRoot(shardRoot);
                 ObjectNode usesRoot = RegistryWrites.usesRoot(shardRoot);
                 RegistryWrites.stripHeavy(shardRoot, entity);
+                mergedShard.setAll(shardRoot);
+                if (mergedIcons != null && iconsRoot != null) {
+                    mergedIcons.setAll(iconsRoot);
+                }
                 String base = "registry/" + kind + "/" + namespace;
                 writes.add(scope.tasks().run(() -> {
                     layout.writeNdjson(new ArtifactAddress.Root(base + ".ndjson"), shardRoot);
@@ -100,6 +107,13 @@ public class RegistryLinkStep {
                     }
                 }));
             }
+            String mergedBase = "registry/" + kind;
+            writes.add(scope.tasks().run(() -> {
+                layout.writeNdjson(new ArtifactAddress.Root(mergedBase + ".ndjson"), mergedShard);
+                if (mergedIcons != null && !mergedIcons.isEmpty()) {
+                    layout.writeNdjson(new ArtifactAddress.Root(mergedBase + ".icons.ndjson"), mergedIcons);
+                }
+            }));
         }
         RunMetrics.Stopwatch drainWatch = scope.metrics().start("commitRegistry.drainMs");
         for (CompletableFuture<?> write : writes) {
