@@ -65,8 +65,7 @@ class QuestFilterItemsTest {
 
     @Test
     void negatedBranchesSkipped() {
-        var out = QuestFilterItems.resolveFilter(
-                "and(item(minecraft:apple)not(item(minecraft:bedrock)))", index());
+        var out = QuestFilterItems.resolveFilter("and(item(minecraft:apple)not(item(minecraft:bedrock)))", index());
         assertEquals(List.of("minecraft:apple"), List.copyOf(out));
     }
 

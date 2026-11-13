@@ -164,9 +164,8 @@ public class LangDump {
         if (layout == null || merged.isEmpty()) {
             return;
         }
-        layout.writeNdjson(
-                new ArtifactAddress.Root("keybinds.ndjson"),
-                (ObjectNode) DumpJson.mapper().valueToTree(merged));
+        layout.writeNdjson(new ArtifactAddress.Root("keybinds.ndjson"), (ObjectNode)
+                DumpJson.mapper().valueToTree(merged));
     }
 
     private static String keybindOwner(String name, Set<String> namespaces) {

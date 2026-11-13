@@ -33,6 +33,7 @@ class DumpSchemasTest {
             "registry/recipes",
             "registry/catalog",
             "lang/catalog",
+            "lang/missing",
             "assets/models/model",
             "data/recipes/recipe",
             "data/index/recipes",

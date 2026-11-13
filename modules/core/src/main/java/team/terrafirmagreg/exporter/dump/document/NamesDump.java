@@ -65,9 +65,8 @@ public class NamesDump {
             for (Map.Entry<String, NameTarget> target : targets.entrySet()) {
                 names.put(target.getKey(), resolve(merged, target.getValue()));
             }
-            layout.writeNdjson(
-                    new ArtifactAddress.Root("names/" + code + ".ndjson"),
-                    (ObjectNode) DumpJson.mapper().valueToTree(names));
+            layout.writeNdjson(new ArtifactAddress.Root("names/" + code + ".ndjson"), (ObjectNode)
+                    DumpJson.mapper().valueToTree(names));
         }
     }
 

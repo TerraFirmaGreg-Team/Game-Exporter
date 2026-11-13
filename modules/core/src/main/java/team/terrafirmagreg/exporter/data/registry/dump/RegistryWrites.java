@@ -125,8 +125,7 @@ class RegistryWrites {
             if (variant.hasNonNull("tag")) {
                 slimVariant.set("tag", variant.get("tag"));
             }
-            JsonNode display =
-                    tooltipOnly ? tooltipPart(variant.get("display")) : displayName(variant.get("display"));
+            JsonNode display = tooltipOnly ? tooltipPart(variant.get("display")) : displayName(variant.get("display"));
             if (display != null) {
                 slimVariant.set("display", display);
             }
@@ -214,8 +213,7 @@ class RegistryWrites {
             }
             if (entity && row.get("variants") instanceof ArrayNode variants) {
                 for (JsonNode raw : variants) {
-                    if (raw instanceof ObjectNode variant
-                            && variant.get("display") instanceof ObjectNode display) {
+                    if (raw instanceof ObjectNode variant && variant.get("display") instanceof ObjectNode display) {
                         display.remove(List.of("tooltip", "tooltipMods"));
                         if (display.isEmpty()) {
                             variant.remove("display");
@@ -299,9 +297,8 @@ class RegistryWrites {
             }
         }
         if (!merged.isEmpty()) {
-            layout.writeNdjson(
-                    new ArtifactAddress.Root("registry/" + DataPaths.GROUPS + ".ndjson"),
-                    (ObjectNode) DumpJson.mapper().valueToTree(merged));
+            layout.writeNdjson(new ArtifactAddress.Root("registry/" + DataPaths.GROUPS + ".ndjson"), (ObjectNode)
+                    DumpJson.mapper().valueToTree(merged));
         }
     }
 }

@@ -148,7 +148,8 @@ class NamesDumpTest {
                 continue;
             }
             JsonNode row = DumpJson.readTree(line);
-            row.properties().forEach(entry -> out.put(entry.getKey(), entry.getValue().asString()));
+            row.properties()
+                    .forEach(entry -> out.put(entry.getKey(), entry.getValue().asString()));
         }
         return out;
     }

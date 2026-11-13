@@ -96,8 +96,7 @@ public final class LocalStorage implements StorageTarget {
         try {
             Path lockFile = lockFile(key);
             Files.createDirectories(lockFile.getParent());
-            try (FileChannel channel =
-                            FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+            try (FileChannel channel = FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
                     FileLock ignored = channel.lock()) {
                 String token = null;
                 if (Files.isRegularFile(file)) {

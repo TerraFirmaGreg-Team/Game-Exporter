@@ -47,6 +47,7 @@ public class DumpSchemas {
     private static final Type RECIPES = typeOf(new TypeReference<Map<String, RecipeEntry>>() {});
     private static final Type GUIDE_ENTRIES = typeOf(new TypeReference<Map<String, GuideEntry>>() {});
     private static final Type STRING_MAP = typeOf(new TypeReference<Map<String, String>>() {});
+    private static final Type STRING_LIST = typeOf(new TypeReference<List<String>>() {});
     private static final Type RECIPE_LOCATIONS = typeOf(new TypeReference<Map<String, List<PreparedRecipeRow>>>() {});
 
     public static List<DumpSchema> all() {
@@ -75,6 +76,7 @@ public class DumpSchemas {
                 schema("registry/groups", GROUPS),
                 schema("registry/catalog", PreparedCatalog.class),
                 schema("lang/catalog", CatalogLabels.class),
+                schema("lang/missing", STRING_LIST),
                 schema("data/recipes/recipe", RECIPES),
                 schema("data/index/recipes", RecipeRowsDocument.class),
                 schema("registry/recipes", RECIPE_LOCATIONS),

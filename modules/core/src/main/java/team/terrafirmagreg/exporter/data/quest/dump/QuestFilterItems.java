@@ -52,10 +52,8 @@ public class QuestFilterItems {
                             .toList()) {
                         JsonNode tree = DumpJson.readTree(file);
                         if (stampNode(tree, index)) {
-                            String relative = questRoot
-                                    .relativize(file)
-                                    .toString()
-                                    .replace('\\', '/');
+                            String relative =
+                                    questRoot.relativize(file).toString().replace('\\', '/');
                             layout.writeJson(
                                     new ArtifactAddress.Data(namespace, relative, ArtifactAddress.DataKind.QUEST),
                                     tree);
@@ -247,7 +245,9 @@ public class QuestFilterItems {
                     continue;
                 }
                 for (VariantEntry variant : entry.variants()) {
-                    if (variant == null || variant.tag() == null || !variant.tag().isObject()) {
+                    if (variant == null
+                            || variant.tag() == null
+                            || !variant.tag().isObject()) {
                         continue;
                     }
                     JsonNode tag = SnbtToJson.canonicalize(variant.tag());

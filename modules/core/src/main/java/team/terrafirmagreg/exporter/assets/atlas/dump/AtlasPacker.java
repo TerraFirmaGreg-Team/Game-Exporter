@@ -35,8 +35,8 @@ public class AtlasPacker {
         int max = maxPageSize > 0 ? maxPageSize : MAX_ATLAS;
         int cell = iconSize > 0 ? iconSize : DEFAULT_ICON_SIZE;
         PackedSection items = AtlasSectionPacker.packSection(EntryKind.ITEM, sprites, max, cell);
-        List<Path> files = new ObjectArrayList<>(
-                AtlasSheetWrite.writeSheets(layout, GLOBAL_MOD, EntryKind.ITEM, items, scope));
+        List<Path> files =
+                new ObjectArrayList<>(AtlasSheetWrite.writeSheets(layout, GLOBAL_MOD, EntryKind.ITEM, items, scope));
         List<AtlasDocument> placements = new ObjectArrayList<>();
         placements.add(AtlasSheetWrite.document(GLOBAL_MOD, EntryKind.ITEM, items.section()));
         ExportLog.info("atlas pack sprites={} files={}", sprites.size(), files.size());

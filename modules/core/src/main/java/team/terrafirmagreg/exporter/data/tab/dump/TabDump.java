@@ -29,8 +29,7 @@ public class TabDump {
                                     tabEntry.icon(),
                                     tabEntry.items() == null ? List.of() : tabEntry.items()));
         }
-        layout.writeNdjson(
-                new ArtifactAddress.Root("registry/tabs.ndjson"),
-                (ObjectNode) DumpJson.mapper().valueToTree(out));
+        layout.writeNdjson(new ArtifactAddress.Root("registry/tabs.ndjson"), (ObjectNode)
+                DumpJson.mapper().valueToTree(out));
     }
 }

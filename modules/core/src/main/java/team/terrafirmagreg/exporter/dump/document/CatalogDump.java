@@ -51,14 +51,17 @@ public class CatalogDump {
         }
         Map<String, List<String>> tabItems = new TreeMap<>();
         for (TabEntry tab : orderedTabs) {
-            tabItems.put(tab.id(), tab.itemReferences().stream().map(CatalogDump::stackKey).toList());
+            tabItems.put(
+                    tab.id(),
+                    tab.itemReferences().stream().map(CatalogDump::stackKey).toList());
         }
         PreparedCatalog catalog = new PreparedCatalog(
                 ordered(roots.get(EntryKind.ITEM.folder())),
                 ordered(roots.get(EntryKind.FLUID.folder())),
                 usedContent(outputs, categories),
                 orderedTabs.stream()
-                        .map(tab -> new CatalogTab(tab.id(), tab.order(), new CatalogDisplay(null), tab.iconReference()))
+                        .map(tab ->
+                                new CatalogTab(tab.id(), tab.order(), new CatalogDisplay(null), tab.iconReference()))
                         .toList(),
                 tabItems,
                 orderedCategories.stream()
@@ -69,7 +72,9 @@ public class CatalogDump {
                                 category.workstations() == null ? List.of() : category.workstations(),
                                 layout(category.layout())))
                         .toList(),
-                groups.stream().map(group -> new CatalogGroup(group.id(), group.members())).toList());
+                groups.stream()
+                        .map(group -> new CatalogGroup(group.id(), group.members()))
+                        .toList());
         layout.writeJson(new ArtifactAddress.Root("registry/catalog.json"), catalog);
 
         Set<String> namespaces = new TreeSet<>();
@@ -83,7 +88,8 @@ public class CatalogDump {
         groups.forEach(group -> namespace(namespaces, group.id()));
         Map<String, String> modKeys = outputs.findMerged(LangChannels.MOD_KEYS).orElse(Map.of());
         namespaces.addAll(modKeys.keySet());
-        Map<String, Map<String, String>> langs = outputs.findMerged(LangChannels.LANGS).orElse(Map.of());
+        Map<String, Map<String, String>> langs =
+                outputs.findMerged(LangChannels.LANGS).orElse(Map.of());
         Set<String> locales = new TreeSet<>(langs.keySet());
         locales.add("en_us");
         for (String locale : locales) {
@@ -92,9 +98,11 @@ public class CatalogDump {
             Map<String, String> mods = new TreeMap<>();
             for (String namespace : namespaces) {
                 String key = modKeys.get(namespace);
-                mods.put(namespace, key == null || key.isBlank()
-                        ? namespace
-                        : DumpTextFormat.format(DumpText.translate(key), strings::get, Map.of()));
+                mods.put(
+                        namespace,
+                        key == null || key.isBlank()
+                                ? namespace
+                                : DumpTextFormat.format(DumpText.translate(key), strings::get, Map.of()));
             }
             Map<String, String> names = new TreeMap<>();
             for (TabEntry tab : orderedTabs) {
@@ -119,13 +127,15 @@ public class CatalogDump {
     }
 
     private static CatalogLayout layout(RecipeCategoryLayout layout) {
-        return layout == null ? null : new CatalogLayout(
-                layout.w(),
-                layout.h(),
-                layout.scale(),
-                layout.margin(),
-                layout.image(),
-                List.copyOf(layout.slots().values()));
+        return layout == null
+                ? null
+                : new CatalogLayout(
+                        layout.w(),
+                        layout.h(),
+                        layout.scale(),
+                        layout.margin(),
+                        layout.image(),
+                        List.copyOf(layout.slots().values()));
     }
 
     private static String title(Display display, String id, Map<String, String> strings) {
@@ -151,7 +161,9 @@ public class CatalogDump {
         for (Map.Entry<String, JsonNode> field : root.properties()) {
             JsonNode row = field.getValue();
             if (row.hasNonNull("order")) {
-                rows.add(new OrderedId(row.path("id").asString(field.getKey()), row.get("order").asDouble()));
+                rows.add(new OrderedId(
+                        row.path("id").asString(field.getKey()),
+                        row.get("order").asDouble()));
             }
         }
         return rows.stream()
@@ -161,8 +173,8 @@ public class CatalogDump {
     }
 
     private static List<String> usedContent(ExecutionOutputs outputs, List<RecipeCategory> categories) {
-        RecipeEdges edges = RecipeEdges.invert(
-                outputs.findMerged(RecipeChannels.BY_ID).orElse(Map.of()), categories);
+        RecipeEdges edges =
+                RecipeEdges.invert(outputs.findMerged(RecipeChannels.BY_ID).orElse(Map.of()), categories);
         List<String> out = new ArrayList<>(edges.usedContent());
         for (String dumpId : edges.usedTags()) {
             int colon = dumpId.indexOf(':');

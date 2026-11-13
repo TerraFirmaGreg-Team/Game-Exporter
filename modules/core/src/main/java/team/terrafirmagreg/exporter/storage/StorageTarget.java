@@ -13,7 +13,8 @@ public interface StorageTarget {
 
     void put(String key, byte[] payload, String contentType, @Nullable String cacheControl) throws IOException;
 
-    @Nullable StoredValue readForUpdate(String key) throws IOException;
+    @Nullable
+    StoredValue readForUpdate(String key) throws IOException;
 
     boolean compareAndPut(
             String key,

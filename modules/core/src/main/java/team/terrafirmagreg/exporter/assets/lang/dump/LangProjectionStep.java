@@ -5,6 +5,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,8 +57,7 @@ public class LangProjectionStep {
                     }
                     scanInto(mod.resolve("quests"), union, buckets.get("quest"));
                     scanInto(mod.resolve("guides"), union, buckets.get("guide"));
-                    scanInto(mod, union, buckets.get("recipe"),
-                            Set.of(mod.resolve("quests"), mod.resolve("guides")));
+                    scanInto(mod, union, buckets.get("recipe"), Set.of(mod.resolve("quests"), mod.resolve("guides")));
                 }
             }
         }
@@ -72,26 +72,33 @@ public class LangProjectionStep {
             scanFiles(rootJsons, union, buckets.get("recipe"));
         }
         for (String key : union) {
-            if (key.startsWith("tag.") || key.startsWith("mod.") || TYPE_KEY.matcher(key).matches()) {
+            if (key.startsWith("tag.")
+                    || key.startsWith("mod.")
+                    || TYPE_KEY.matcher(key).matches()) {
                 buckets.get("names").add(key);
             }
         }
+        Map<String, String> english = langs.getOrDefault("en_us", Map.of());
         List<CompletableFuture<?>> writes = new ArrayList<>();
         for (Map.Entry<String, Map<String, String>> entry : langs.entrySet()) {
             for (Map.Entry<String, Set<String>> bucket : buckets.entrySet()) {
                 writes.add(scope.tasks().run(() -> {
                     Map<String, String> raw = new TreeMap<>();
+                    List<String> missing = new ArrayList<>();
                     for (String key : bucket.getValue()) {
-                        String value = entry.getValue().getOrDefault(
-                                key, langs.getOrDefault("en_us", Map.of()).get(key));
+                        String own = entry.getValue().get(key);
+                        String value = own != null ? own : english.get(key);
                         if (value != null) {
                             raw.put(key, value);
                         }
+                        if (own == null && value != null) {
+                            missing.add(key);
+                        }
                     }
-                    layout.writeNdjson(
-                            new ArtifactAddress.Root(
-                                    "lang/" + entry.getKey() + "." + bucket.getKey() + ".ndjson"),
-                            stringMap(raw));
+                    String base = "lang/" + entry.getKey() + "." + bucket.getKey();
+                    layout.writeNdjson(new ArtifactAddress.Root(base + ".ndjson"), stringMap(raw));
+                    Collections.sort(missing);
+                    layout.writeJson(new ArtifactAddress.Root(base + ".missing.json"), missing);
                 }));
             }
         }
@@ -109,8 +116,7 @@ public class LangProjectionStep {
         scanInto(dir, union, out, Set.of());
     }
 
-    private static void scanInto(Path dir, Set<String> union, Set<String> out, Set<Path> skip)
-            throws IOException {
+    private static void scanInto(Path dir, Set<String> union, Set<String> out, Set<Path> skip) throws IOException {
         if (dir == null || !Files.isDirectory(dir)) {
             return;
         }
@@ -135,8 +141,7 @@ public class LangProjectionStep {
                         if (literal.length() <= 2) continue;
                         if (union.contains(literal)) {
                             out.add(literal);
-                        } else if (literal.charAt(0) == '{'
-                                && literal.charAt(literal.length() - 1) == '}') {
+                        } else if (literal.charAt(0) == '{' && literal.charAt(literal.length() - 1) == '}') {
                             String inner = literal.substring(1, literal.length() - 1);
                             if (union.contains(inner)) {
                                 out.add(inner);

@@ -62,15 +62,14 @@ public final class QuestComponent implements ExportComponent {
         List<PlanNode> nodes = new ArrayList<>();
         if (context.selected(ComponentKeys.ASSETS_TEXTURES)
                 && context.component(ComponentKeys.ASSETS_TEXTURES) != null) {
-            nodes.add(PlanNode.builder(
-                            CHAPTER_IMAGES_NODE, ctx -> ChapterImageStamp.stampChapterImages(context.layout()))
-                    .lane(Lane.IO)
-                    .input(ComponentOutputs.QUESTS)
-                    .input(TextureStageKeys.COPIED)
-                    .build());
+            nodes.add(
+                    PlanNode.builder(CHAPTER_IMAGES_NODE, ctx -> ChapterImageStamp.stampChapterImages(context.layout()))
+                            .lane(Lane.IO)
+                            .input(ComponentOutputs.QUESTS)
+                            .input(TextureStageKeys.COPIED)
+                            .build());
         }
-        if (context.selected(ComponentKeys.DATA_ITEMS)
-                && context.component(ComponentKeys.DATA_ITEMS) != null) {
+        if (context.selected(ComponentKeys.DATA_ITEMS) && context.component(ComponentKeys.DATA_ITEMS) != null) {
             nodes.add(PlanNode.builder(
                             FILTER_ITEMS_NODE,
                             ctx -> QuestFilterItems.stampFilterItems(

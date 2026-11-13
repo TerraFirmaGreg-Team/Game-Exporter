@@ -29,12 +29,21 @@ class CatalogDumpTest {
     @Test
     void ordersNeutralRowsAndPreservesExactMembersAndRecipeUsage() throws Exception {
         ExecutionOutputs outputs = new ExecutionOutputs();
-        outputs.contribute(RecipeChannels.BY_ID, Map.of("test:recipe",
-                RecipeEntry.builder().category("test:craft").slots(Map.of(
-                        "input", new RecipeSlot(EntryKind.ITEM, "test:gem{mode:1}", 1),
-                        "tag", new RecipeSlot(EntryKind.ITEM, "#test:ores/gem", 1),
-                        "output", new RecipeSlot("output", new RecipeSlot(EntryKind.FLUID, "test:water", 1).ref(), 1)))
-                        .build()));
+        outputs.contribute(
+                RecipeChannels.BY_ID,
+                Map.of(
+                        "test:recipe",
+                        RecipeEntry.builder()
+                                .category("test:craft")
+                                .slots(Map.of(
+                                        "input", new RecipeSlot(EntryKind.ITEM, "test:gem{mode:1}", 1),
+                                        "tag", new RecipeSlot(EntryKind.ITEM, "#test:ores/gem", 1),
+                                        "output",
+                                                new RecipeSlot(
+                                                        "output",
+                                                        new RecipeSlot(EntryKind.FLUID, "test:water", 1).ref(),
+                                                        1)))
+                                .build()));
         ObjectNode items = (ObjectNode) DumpJson.readTree("""
                 {
                   "test:z":{"order":2,"display":{"name":"Do not embed"}},
@@ -48,24 +57,43 @@ class CatalogDumpTest {
                 tab("test:b", 1, "tab.b", List.of("test:gem{mode:1}", "test:a")),
                 tab("test:a", 1, "tab.a", List.of()));
         RecipeCategoryLayout layout = RecipeCategoryLayout.builder()
-                .w(100).h(40).slots(Map.of("input", new RecipeLayoutSlot("input", 1, 2, 18, 18, "input"))).build();
+                .w(100)
+                .h(40)
+                .slots(Map.of("input", new RecipeLayoutSlot("input", 1, 2, 18, 18, "input")))
+                .build();
         List<RecipeCategory> categories = List.of(
                 category("test:z", 2, "category.z"),
                 category("test:craft", 1, "category.craft").withLayout(layout));
-        CatalogDump.write(new DumpLayout(root), outputs, Map.of("items", items), tabs, categories, Map.of(
-                "item", List.of(StackGroup.of("test:z", DumpText.text("Not neutral"), List.of("test:z", "test:a"))),
-                "fluid", List.of(StackGroup.of("test:water", null, List.of("test:water")))));
+        CatalogDump.write(
+                new DumpLayout(root),
+                outputs,
+                Map.of("items", items),
+                tabs,
+                categories,
+                Map.of(
+                        "item",
+                                List.of(StackGroup.of(
+                                        "test:z", DumpText.text("Not neutral"), List.of("test:z", "test:a"))),
+                        "fluid", List.of(StackGroup.of("test:water", null, List.of("test:water")))));
         JsonNode catalog = read("registry/catalog.json");
         assertEquals(List.of("test:gem{mode:1}", "test:a", "test:z"), strings(catalog.get("items")));
         assertTrue(catalog.get("fluids").isEmpty());
         assertEquals(List.of("test:gem", "test:water", "#test:ores/gem"), strings(catalog.get("usedIds")));
-        assertEquals(List.of("test:gem{mode:1}", "test:a"), strings(catalog.get("tabItems").get("test:b")));
-        assertEquals(List.of("test:a", "test:b", "test:z"),
-                catalog.get("tabs").valueStream().map(row -> row.get("id").asString()).toList());
+        assertEquals(
+                List.of("test:gem{mode:1}", "test:a"),
+                strings(catalog.get("tabItems").get("test:b")));
+        assertEquals(
+                List.of("test:a", "test:b", "test:z"),
+                catalog.get("tabs")
+                        .valueStream()
+                        .map(row -> row.get("id").asString())
+                        .toList());
         assertEquals("test:craft", catalog.get("categories").get(0).get("id").asString());
         assertTrue(catalog.get("categories").get(0).get("layout").get("slots").isArray());
         assertEquals("test:water", catalog.get("groups").get(0).get("id").asString());
-        assertEquals(List.of("test:z", "test:a"), strings(catalog.get("groups").get(1).get("members")));
+        assertEquals(
+                List.of("test:z", "test:a"),
+                strings(catalog.get("groups").get(1).get("members")));
         String neutral = Files.readString(root.resolve("registry/catalog.json"));
         assertFalse(neutral.contains("Do not embed"));
         assertFalse(neutral.contains("Not neutral"));
@@ -79,13 +107,29 @@ class CatalogDumpTest {
     void resolvesOnlyChromeLabelsWithLocaleOverridesAndEnglishFallback() throws Exception {
         ExecutionOutputs outputs = new ExecutionOutputs();
         outputs.contribute(LangChannels.MOD_KEYS, Map.of("test", "mod.test", "extra", "mod.extra"));
-        outputs.contribute(LangChannels.LANGS, Map.of(
-                "en_us", Map.of("mod.test", "Test", "mod.extra", "Extra", "tab.title", "Tools",
-                        "category.title", "Craft", "group.title", "Group %s", "unrelated", "Never included"),
-                "fr_fr", Map.of("tab.title", "Outils", "group.title", "Groupe %s"),
-                "ru_ru", Map.of("category.title", "Создание", "mod.test", "Тест")));
+        outputs.contribute(
+                LangChannels.LANGS,
+                Map.of(
+                        "en_us",
+                                Map.of(
+                                        "mod.test",
+                                        "Test",
+                                        "mod.extra",
+                                        "Extra",
+                                        "tab.title",
+                                        "Tools",
+                                        "category.title",
+                                        "Craft",
+                                        "group.title",
+                                        "Group %s",
+                                        "unrelated",
+                                        "Never included"),
+                        "fr_fr", Map.of("tab.title", "Outils", "group.title", "Groupe %s"),
+                        "ru_ru", Map.of("category.title", "Создание", "mod.test", "Тест")));
         DumpText groupName = new DumpText("group.title", null, null, List.of(DumpText.text("A")), null);
-        CatalogDump.write(new DumpLayout(root), outputs,
+        CatalogDump.write(
+                new DumpLayout(root),
+                outputs,
                 Map.of("items", (ObjectNode) DumpJson.readTree("{\"bare:item\":{}}")),
                 List.of(tab("test:tab", 0, "tab.title", List.of()), tab("test:absent", 1, null, List.of())),
                 List.of(category("test:craft", 0, "category.title"), category("test:missing", 1, "missing.key")),
@@ -129,7 +173,11 @@ class CatalogDumpTest {
     }
 
     private static RecipeCategory category(String id, int order, String name) {
-        return RecipeCategory.builder().id(id).order(order).display(Display.of(name)).build();
+        return RecipeCategory.builder()
+                .id(id)
+                .order(order)
+                .display(Display.of(name))
+                .build();
     }
 
     private JsonNode read(String path) throws Exception {

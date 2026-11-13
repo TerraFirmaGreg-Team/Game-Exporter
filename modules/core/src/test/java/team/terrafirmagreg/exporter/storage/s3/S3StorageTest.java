@@ -36,12 +36,7 @@ class S3StorageTest {
     private final Object storeLock = new Object();
 
     private record SeenRequest(
-            String method,
-            String key,
-            String ifMatch,
-            String ifNoneMatch,
-            String contentType,
-            String cacheControl) {}
+            String method, String key, String ifMatch, String ifNoneMatch, String contentType, String cacheControl) {}
 
     @BeforeEach
     void setUp() throws IOException {
@@ -49,12 +44,7 @@ class S3StorageTest {
         server.createContext("/", this::handle);
         server.start();
         S3Client client = new S3Client(
-                "http://127.0.0.1:" + server.getAddress().getPort(),
-                "bucket",
-                "us-east-1",
-                true,
-                "access",
-                "secret");
+                "http://127.0.0.1:" + server.getAddress().getPort(), "bucket", "us-east-1", true, "access", "secret");
         storage = new S3Storage(client);
     }
 
@@ -149,16 +139,15 @@ class S3StorageTest {
         byte[] first = "one".getBytes(StandardCharsets.UTF_8);
         byte[] second = "two".getBytes(StandardCharsets.UTF_8);
 
-        assertTrue(storage.compareAndPut(
-                "pack/versions.json", null, first, "application/json", "public, max-age=60"));
+        assertTrue(storage.compareAndPut("pack/versions.json", null, first, "application/json", "public, max-age=60"));
         SeenRequest create = lastRequest("PUT", "pack/versions.json");
         assertEquals("*", create.ifNoneMatch());
         assertNull(create.ifMatch());
         assertEquals("application/json", create.contentType());
         assertEquals("public, max-age=60", create.cacheControl());
 
-        assertFalse(storage.compareAndPut(
-                "pack/versions.json", null, second, "application/json", "public, max-age=60"));
+        assertFalse(
+                storage.compareAndPut("pack/versions.json", null, second, "application/json", "public, max-age=60"));
 
         StoredValue current = storage.readForUpdate("pack/versions.json");
         assertNotNull(current);
@@ -245,11 +234,7 @@ class S3StorageTest {
 
     @Test
     void ordinaryPutSendsContentTypeAndCacheControl() throws IOException {
-        storage.put(
-                "pack/a.webp",
-                new byte[] {1, 2},
-                "image/webp",
-                "public, max-age=31536000, immutable");
+        storage.put("pack/a.webp", new byte[] {1, 2}, "image/webp", "public, max-age=31536000, immutable");
         SeenRequest put = lastRequest("PUT", "pack/a.webp");
         assertEquals("image/webp", put.contentType());
         assertEquals("public, max-age=31536000, immutable", put.cacheControl());

@@ -101,8 +101,7 @@ public class RegistryLinkStep {
                         layout.writeNdjson(new ArtifactAddress.Root(base + ".tooltips.ndjson"), tooltipsRoot);
                     }
                     if (usesRoot != null) {
-                        layout.writeNdjson(
-                                new ArtifactAddress.Root(base + ".uses.ndjson"), EdgeTable.intern(usesRoot));
+                        layout.writeNdjson(new ArtifactAddress.Root(base + ".uses.ndjson"), EdgeTable.intern(usesRoot));
                     }
                 }));
             }

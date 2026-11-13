@@ -31,9 +31,18 @@ class LangProjectionStepTest {
         Files.createDirectories(root.resolve("data/test/recipes"));
         Files.writeString(root.resolve("data/test/recipes/craft.json"), "{\"name\":\"recipe.test.title\"}");
         ExecutionOutputs outputs = new ExecutionOutputs();
-        outputs.contribute(LangChannels.LANGS, Map.of(
-                "en_us", Map.of("item.test.title", "Title", "recipe.test.title", "Recipe", "unrelated", "Ignored"),
-                "fr_fr", Map.of("item.test.title", "Titre")));
+        outputs.contribute(
+                LangChannels.LANGS,
+                Map.of(
+                        "en_us",
+                                Map.of(
+                                        "item.test.title",
+                                        "Title",
+                                        "recipe.test.title",
+                                        "Recipe",
+                                        "unrelated",
+                                        "Ignored"),
+                        "fr_fr", Map.of("item.test.title", "Titre")));
         try (RunScope scope = new RunScope()) {
             LangProjectionStep.apply(new DumpLayout(root), outputs, scope);
         }
@@ -52,8 +61,9 @@ class LangProjectionStepTest {
     void requiredSourceReadFailurePropagatesIOException() throws Exception {
         var scan = LangProjectionStep.class.getDeclaredMethod("scanFiles", List.class, Set.class, Set.class);
         scan.setAccessible(true);
-        InvocationTargetException error = assertThrows(InvocationTargetException.class, () ->
-                scan.invoke(null, List.of(root.resolve("missing.json")), Set.of("key"), new HashSet<String>()));
+        InvocationTargetException error = assertThrows(
+                InvocationTargetException.class,
+                () -> scan.invoke(null, List.of(root.resolve("missing.json")), Set.of("key"), new HashSet<String>()));
         assertInstanceOf(IOException.class, error.getCause());
     }
 
@@ -61,7 +71,8 @@ class LangProjectionStepTest {
         Map<String, String> out = new TreeMap<>();
         for (String line : Files.readAllLines(root.resolve("lang/" + part + ".ndjson"))) {
             JsonNode node = DumpJson.readTree(line);
-            node.properties().forEach(entry -> out.put(entry.getKey(), entry.getValue().asString()));
+            node.properties()
+                    .forEach(entry -> out.put(entry.getKey(), entry.getValue().asString()));
         }
         return out;
     }

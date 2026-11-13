@@ -268,11 +268,12 @@ class StorageSyncTest {
     void corruptPointerIsRejected() throws IOException {
         Path root = dumpTree();
         LocalStorage target = new LocalStorage(tmp.resolve("store"));
-        target.put("pack/" + StorageSync.VERSIONS, "{not json".getBytes(StandardCharsets.UTF_8), "application/json", null);
+        target.put(
+                "pack/" + StorageSync.VERSIONS, "{not json".getBytes(StandardCharsets.UTF_8), "application/json", null);
         IOException thrown = assertThrows(IOException.class, () -> sync(target, root, "1.0.0", false));
-        assertTrue(thrown.getMessage().contains("versions.json") || thrown.getMessage().contains("Corrupt"));
-        assertArrayEquals(
-                "{not json".getBytes(StandardCharsets.UTF_8), target.get("pack/" + StorageSync.VERSIONS));
+        assertTrue(thrown.getMessage().contains("versions.json")
+                || thrown.getMessage().contains("Corrupt"));
+        assertArrayEquals("{not json".getBytes(StandardCharsets.UTF_8), target.get("pack/" + StorageSync.VERSIONS));
     }
 
     @Test

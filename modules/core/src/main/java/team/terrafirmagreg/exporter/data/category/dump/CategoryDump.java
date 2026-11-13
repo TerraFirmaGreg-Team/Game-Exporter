@@ -30,8 +30,7 @@ public class CategoryDump {
                                     category.workstations(),
                                     category.layout()));
         }
-        layout.writeNdjson(
-                new ArtifactAddress.Root("registry/recipe_categories.ndjson"),
-                (ObjectNode) DumpJson.mapper().valueToTree(out));
+        layout.writeNdjson(new ArtifactAddress.Root("registry/recipe_categories.ndjson"), (ObjectNode)
+                DumpJson.mapper().valueToTree(out));
     }
 }

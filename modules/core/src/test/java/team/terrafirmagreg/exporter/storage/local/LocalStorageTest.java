@@ -119,9 +119,8 @@ class LocalStorageTest {
 
         assertEquals(1, wins.get());
         byte[] finalBytes = storage.get("pack/versions.json");
-        assertTrue(
-                "alpha".equals(new String(finalBytes, StandardCharsets.UTF_8))
-                        || "beta".equals(new String(finalBytes, StandardCharsets.UTF_8)));
+        assertTrue("alpha".equals(new String(finalBytes, StandardCharsets.UTF_8))
+                || "beta".equals(new String(finalBytes, StandardCharsets.UTF_8)));
     }
 
     @Test
@@ -136,7 +135,8 @@ class LocalStorageTest {
 
     @Test
     void lockFilesStayOutsideVisibleRoot() throws IOException {
-        storage.compareAndPut("pack/versions.json", null, "x".getBytes(StandardCharsets.UTF_8), "application/json", null);
+        storage.compareAndPut(
+                "pack/versions.json", null, "x".getBytes(StandardCharsets.UTF_8), "application/json", null);
         Path locks = dir.resolve(".store.cas-locks");
         assertTrue(Files.isDirectory(locks));
         try (var walk = Files.walk(locks)) {

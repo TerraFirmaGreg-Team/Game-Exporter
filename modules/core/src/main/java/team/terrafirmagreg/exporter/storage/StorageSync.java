@@ -78,8 +78,7 @@ public class StorageSync {
                 String rel = source.getKey();
                 DocumentCodec sourceCodec = DocumentCodec.sourceFor(rel);
                 DocumentCodec codec = policy.codecFor(rel);
-                Compression compression =
-                        codec == DocumentCodec.BINARY ? Compression.NONE : policy.compression();
+                Compression compression = codec == DocumentCodec.BINARY ? Compression.NONE : policy.compression();
                 Path raw = source.getValue();
                 if (codec != sourceCodec) {
                     Path out = Files.createTempFile(staging, "encoded-", ".tmp");
@@ -245,8 +244,8 @@ public class StorageSync {
         String gzip = artifact.compression() == ArtifactDescriptor.Compression.GZIP ? ".gz" : "";
         if (namespace != null) {
             String ext = DumpFiles.extension(emittedPath(rel, artifact));
-            return packPrefix + "objects/" + namespace + "/" + artifact.sha256()
-                    + (ext.isEmpty() ? "" : "." + ext) + gzip;
+            return packPrefix + "objects/" + namespace + "/" + artifact.sha256() + (ext.isEmpty() ? "" : "." + ext)
+                    + gzip;
         }
         return snapshotPrefix + emittedPath(rel, artifact) + gzip;
     }
