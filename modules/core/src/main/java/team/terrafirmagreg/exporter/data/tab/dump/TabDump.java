@@ -8,6 +8,8 @@ import lombok.experimental.UtilityClass;
 import team.terrafirmagreg.exporter.contract.dto.tab.TabEntry;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
 import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
+import team.terrafirmagreg.exporter.dump.io.DumpJson;
+import tools.jackson.databind.node.ObjectNode;
 
 @UtilityClass
 public class TabDump {
@@ -27,6 +29,8 @@ public class TabDump {
                                     tabEntry.icon(),
                                     tabEntry.items() == null ? List.of() : tabEntry.items()));
         }
-        layout.writeJson(new ArtifactAddress.Root("registry/tabs"), out);
+        layout.writeNdjson(
+                new ArtifactAddress.Root("registry/tabs.ndjson"),
+                (ObjectNode) DumpJson.mapper().valueToTree(out));
     }
 }

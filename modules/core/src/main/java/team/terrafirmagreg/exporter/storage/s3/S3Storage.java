@@ -44,6 +44,22 @@ public final class S3Storage implements StorageTarget {
     }
 
     @Override
+    public @Nullable StoredValue readForUpdate(String key) throws IOException {
+        return client.getForUpdate(key);
+    }
+
+    @Override
+    public boolean compareAndPut(
+            String key,
+            @Nullable String expectedToken,
+            byte[] payload,
+            String contentType,
+            @Nullable String cacheControl)
+            throws IOException {
+        return client.compareAndPut(key, expectedToken, payload, contentType, cacheControl);
+    }
+
+    @Override
     public List<String> listKeys(String prefix) throws IOException {
         return client.listKeys(prefix);
     }

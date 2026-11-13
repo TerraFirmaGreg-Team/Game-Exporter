@@ -51,7 +51,7 @@ class LangDumpTest {
         LangWrite written =
                 LangDump.writeAssetLang(new DumpLayout(dir), List.of("en_us"), List.of(source), ModIdFilter.allowAll());
         assertEquals(Map.of("k.a", "A", "k.b", "B"), written.langs().get("en_us"));
-        assertTrue(Files.exists(dir.resolve("lang/en_us.json")));
+        assertFalse(Files.exists(dir.resolve("lang/en_us.json")));
         assertEquals(2, written.keys());
         assertEquals(Set.of("tfg"), written.ownedModIds());
         assertEquals(Set.of("en_us"), written.namespaceLanguages().get("tfg"));

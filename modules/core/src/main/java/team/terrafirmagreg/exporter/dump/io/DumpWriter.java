@@ -1,14 +1,15 @@
 package team.terrafirmagreg.exporter.dump.io;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
+import java.io.OutputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
-import team.terrafirmagreg.exporter.dump.DumpFiles;
 import team.terrafirmagreg.exporter.util.ExportLog;
 import tools.jackson.core.JacksonException;
+import tools.jackson.core.StreamWriteFeature;
 import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
 public final class DumpWriter {
@@ -26,7 +27,14 @@ public final class DumpWriter {
     }
 
     public void writeJson(Path file, Object value) throws IOException {
-        DumpFiles.write(file, mapper.writeValueAsBytes(value));
+        Files.createDirectories(file.getParent());
+        try (OutputStream out = Files.newOutputStream(file)) {
+            writeJson(out, value);
+        }
+    }
+
+    public void writeJson(OutputStream out, Object value) throws IOException {
+        mapper.writer().without(StreamWriteFeature.AUTO_CLOSE_TARGET).writeValue(out, value);
     }
 
     public <T> void writeTreeOrValue(Path file, ObjectNode node, Class<T> type) throws IOException {
@@ -44,22 +52,28 @@ public final class DumpWriter {
     }
 
     public byte[] toNdjsonBytes(ObjectNode root) {
-        StringBuilder out = new StringBuilder(root.size() * 256);
-        JsonNode ids = root.get("$ids");
-        if (ids != null) {
-            out.append("{\"$ids\":").append(ids.toString()).append("}\n");
-        }
-        for (Map.Entry<String, JsonNode> field : root.properties()) {
-            if ("$ids".equals(field.getKey())) {
-                continue;
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        writeNdjson(out, root);
+        return out.toByteArray();
+    }
+
+    public void writeNdjson(OutputStream out, ObjectNode root) {
+        writeNdjson(out, root.properties());
+    }
+
+    public void writeNdjson(OutputStream out, Iterable<? extends Map.Entry<String, ?>> fields) {
+        try (var generator = DumpJson.compactMapper()
+                .writer()
+                .without(StreamWriteFeature.AUTO_CLOSE_TARGET)
+                .withRootValueSeparator("")
+                .createGenerator(out)) {
+            for (Map.Entry<String, ?> field : fields) {
+                generator.writeStartObject();
+                generator.writeName(field.getKey());
+                generator.writePOJO(field.getValue());
+                generator.writeEndObject();
+                generator.writeRaw('\n');
             }
-            JsonNode row = field.getValue();
-            if (row instanceof ObjectNode object && !object.has("id")) {
-                object = object.deepCopy();
-                object.put("id", field.getKey());
-            }
-            out.append(row.toString()).append('\n');
         }
-        return out.toString().getBytes(StandardCharsets.UTF_8);
     }
 }

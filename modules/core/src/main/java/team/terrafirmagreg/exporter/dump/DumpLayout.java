@@ -1,12 +1,15 @@
 package team.terrafirmagreg.exporter.dump;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import team.terrafirmagreg.exporter.contract.id.EntryKind;
 import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
 import team.terrafirmagreg.exporter.dump.io.ArtifactAddressRenderer;
 import team.terrafirmagreg.exporter.dump.io.DumpWriter;
+import team.terrafirmagreg.exporter.dump.io.IOConsumer;
 import team.terrafirmagreg.exporter.dump.transaction.ArtifactWriter;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -42,11 +45,40 @@ public record DumpLayout(Path root, DumpWriter writer, ArtifactWriter artifacts)
     }
 
     public void writeJson(ArtifactAddress address, Object value) throws IOException {
-        write(address, writer.toJsonBytes(value));
+        write(address, out -> writer.writeJson(out, value));
     }
 
     public void writeNdjson(ArtifactAddress address, ObjectNode root) throws IOException {
-        write(address, writer.toNdjsonBytes(root));
+        write(address, out -> writer.writeNdjson(out, root));
+    }
+
+    public void writeTable(ArtifactAddress address, Map<String, ?> table) throws IOException {
+        String relative = new ArtifactAddressRenderer(root).relative(address);
+        if (relative.endsWith(".ndjson")) {
+            write(address, out -> writer.writeNdjson(out, table.entrySet()));
+        } else if (relative.endsWith(".json")) {
+            writeJson(address, table);
+        } else {
+            throw new IllegalArgumentException("Table artifact must have a JSON or NDJSON address: " + relative);
+        }
+    }
+
+    private void write(ArtifactAddress address, IOConsumer<OutputStream> content) throws IOException {
+        if (artifacts != null) {
+            artifacts.write(address, address.mediaType(), content);
+            return;
+        }
+        Path target = new ArtifactAddressRenderer(root).render(address);
+        Files.createDirectories(target.getParent());
+        Path temporary = Files.createTempFile(target.getParent(), "." + target.getFileName(), ".writing");
+        try {
+            try (OutputStream out = Files.newOutputStream(temporary)) {
+                content.accept(out);
+            }
+            DumpFiles.replace(temporary, target);
+        } finally {
+            Files.deleteIfExists(temporary);
+        }
     }
 
     public void discard(ArtifactAddress address) throws IOException {
@@ -86,7 +118,7 @@ public record DumpLayout(Path root, DumpWriter writer, ArtifactWriter artifacts)
     }
 
     public Path keybinds() {
-        return root.resolve("keybinds.json");
+        return root.resolve("keybinds.ndjson");
     }
 
     public Path assets() {
@@ -95,10 +127,6 @@ public record DumpLayout(Path root, DumpWriter writer, ArtifactWriter artifacts)
 
     public Path assets(String modId) {
         return AssetPaths.assets(this, modId);
-    }
-
-    public Path atlasItemPage(String modId, int page) {
-        return AssetPaths.atlasPage(this, modId, EntryKind.ITEM, page);
     }
 
     public Path atlasBlockPage(String modId, int page) {

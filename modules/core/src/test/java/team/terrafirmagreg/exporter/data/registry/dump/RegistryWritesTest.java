@@ -50,19 +50,24 @@ class RegistryWritesTest {
         ObjectNode icons = RegistryWrites.iconsRoot(shard);
 
         assertNotNull(icons);
-        assertFalse(icons.has("tfc:wood"), "spriteless rows are dropped");
         var slim = icons.get("tfc:rock");
         assertNotNull(slim.get("sprite"));
         assertEquals("item.tfc.rock", slim.get("display").get("name").asString());
         assertNull(slim.get("tags"), "heavy fields are stripped");
         assertNull(slim.get("usedBy"), "edge fields are stripped");
         assertNull(slim.get("display").get("tooltip"));
+        var wood = icons.get("tfc:wood");
+        assertNotNull(wood.get("display"), "display name keeps spriteless rows resolvable");
+        assertNull(wood.get("sprite"));
+        assertNull(wood.get("tags"));
     }
 
     @Test
-    void iconsRootNullWhenNoSprites() {
+    void iconsRootNullWhenNoIconData() {
         ObjectNode shard = DumpJson.mapper().createObjectNode();
-        shard.set("tfc:wood", row("tfc:wood", false));
+        ObjectNode bare = DumpJson.mapper().createObjectNode();
+        bare.put("id", "tfc:wood");
+        shard.set("tfc:wood", bare);
 
         assertNull(RegistryWrites.iconsRoot(shard));
     }

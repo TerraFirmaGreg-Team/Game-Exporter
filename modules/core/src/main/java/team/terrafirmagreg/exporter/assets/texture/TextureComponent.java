@@ -93,13 +93,10 @@ public final class TextureComponent implements ExportComponent {
         ComponentResultBuilder b = ComponentResult.builder(id())
                 .ownedModIds(owned)
                 .count("itemSprites", plan.items().size() + plan.fluids().size())
-                .count("blockSprites", 0)
                 .count("texturesCopied", copied.copied())
                 .count("entityPreviews", 0)
                 .iconSize(options.iconSize())
                 .atlasMaxPageSize(options.atlasMaxPageSize());
-        context.contribute(SpriteChannels.ITEM_KEYS, atlas.itemSpriteKeys());
-        context.contribute(SpriteChannels.BLOCK_KEYS, atlas.blockSpriteKeys());
         if (sources.first() == null) {
             b.status(ComponentResult.Status.SKIPPED)
                     .diagnostic("no texture source")

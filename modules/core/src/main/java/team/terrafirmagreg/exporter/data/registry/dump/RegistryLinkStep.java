@@ -22,6 +22,7 @@ import team.terrafirmagreg.exporter.data.registry.RegistryChannels;
 import team.terrafirmagreg.exporter.dump.DataPaths;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
 import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
+import team.terrafirmagreg.exporter.dump.document.CatalogDump;
 import team.terrafirmagreg.exporter.dump.io.DumpJson;
 import team.terrafirmagreg.exporter.engine.report.RunMetrics;
 import team.terrafirmagreg.exporter.engine.run.ExecutionOutputs;
@@ -75,6 +76,7 @@ public class RegistryLinkStep {
             RunTasks.await(link);
         }
         linkWatch.stop();
+        CatalogDump.write(layout, outputs, roots, tabs, categories, groupsByKind);
         for (Map.Entry<String, ObjectNode> entry : roots.entrySet()) {
             String kind = entry.getKey();
             boolean entity = EntryKind.ENTITY.folder().equals(kind);
@@ -95,9 +97,6 @@ public class RegistryLinkStep {
                 String base = "registry/" + kind + "/" + namespace;
                 writes.add(scope.tasks().run(() -> {
                     layout.writeNdjson(new ArtifactAddress.Root(base + ".ndjson"), shardRoot);
-                    if (iconsRoot != null) {
-                        layout.writeNdjson(new ArtifactAddress.Root(base + ".icons.ndjson"), iconsRoot);
-                    }
                     if (tooltipsRoot != null) {
                         layout.writeNdjson(new ArtifactAddress.Root(base + ".tooltips.ndjson"), tooltipsRoot);
                     }

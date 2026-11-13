@@ -81,7 +81,6 @@ public final class RecipeComponent implements ExportComponent {
     @Override
     public ComponentResult execute(ExportSpec request, DumpLayout layout, ExecutionContext context) throws IOException {
         RunScope scope = context.scope();
-        RecipesComponentConfig options = request.data().recipes();
         ModIdFilter filter = request.filterFor(id());
         RecipeSnapshot captured = sources.isEmpty()
                 ? RecipeSnapshot.empty()
@@ -99,7 +98,6 @@ public final class RecipeComponent implements ExportComponent {
             recipes = scoped;
         }
         Map<String, RecipeEntry> written = new Object2ObjectLinkedOpenHashMap<>();
-        Map<String, Map<String, Map<String, RecipeEntry>>> buckets = new Object2ObjectLinkedOpenHashMap<>();
         ExportLog.Progress writes = ExportLog.progress("data.recipes.write", recipes.size());
         int invalidIds = 0;
         int missingCategory = 0;
@@ -120,32 +118,27 @@ public final class RecipeComponent implements ExportComponent {
             }
             String canonicalId = parsedId.id();
             RecipeEntry body = e.getValue();
-            written.put(RecipeKey.scoped(body.category(), canonicalId), body);
             String categoryPath = RecipeDump.categoryPath(body);
             if (categoryPath == null) {
                 missingCategory++;
             } else {
-                buckets.computeIfAbsent(parsedId.namespace(), ignored -> new Object2ObjectLinkedOpenHashMap<>())
-                        .computeIfAbsent(categoryPath, ignored -> new Object2ObjectLinkedOpenHashMap<>())
-                        .put(canonicalId, body);
+                written.put(RecipeKey.scoped(body.category(), canonicalId), body);
             }
             writes.step();
         }
+        RecipeProjection projection = RecipeProjection.build(written, captured.layouts());
         int submitted = 0;
-        for (Map.Entry<String, Map<String, Map<String, RecipeEntry>>> ns : buckets.entrySet()) {
-            for (Map.Entry<String, Map<String, RecipeEntry>> bucket :
-                    ns.getValue().entrySet()) {
-                scope.tasks().submit(() -> RecipeDump.write(layout, ns.getKey(), bucket.getKey(), bucket.getValue()));
-                submitted++;
-                if (submitted % WRITE_BATCH == 0) {
-                    scope.tasks().reapCompleted();
-                }
+        for (var block : projection.blocks().entrySet()) {
+            scope.tasks().submit(() -> RecipeDump.writeBlock(layout, block.getKey(), block.getValue()));
+            submitted++;
+            if (submitted % WRITE_BATCH == 0) {
+                scope.tasks().reapCompleted();
             }
         }
         scope.tasks().reapCompleted();
         writes.done();
         ExportLog.info(
-                "recipe json submitted {} buckets/{}; card encodes in flight pending={}",
+                "recipe json submitted {} blocks/{}; card encodes in flight pending={}",
                 submitted,
                 recipes.size(),
                 scope.tasks().pendingCount());
@@ -153,6 +146,15 @@ public final class RecipeComponent implements ExportComponent {
                 .resourceDemand(RecipeSnapshot.demandOf(written))
                 .count("recipes", written.size());
         context.contribute(RecipeChannels.BY_ID, written);
+        context.contribute(RecipeChannels.PROJECTION, projection);
+        scope.metrics().record("recipeOversizedBlocks", projection.oversizedBlocks());
+        result.count("recipeBlocks", projection.blocks().size())
+                .count("recipeOversizedBlocks", projection.oversizedBlocks());
+        if (projection.oversizedBlocks() > 0) {
+            result.diagnostic("Wrote " + projection.oversizedBlocks()
+                    + " oversized recipes in individual blocks exceeding "
+                    + RecipeProjection.DEFAULT_BLOCK_BYTES + " encoded JSON bytes");
+        }
         if (invalidIds > 0) {
             result.diagnostic("Skipped " + invalidIds + " recipes with invalid ids");
         }

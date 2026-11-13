@@ -23,10 +23,12 @@ import team.terrafirmagreg.exporter.contract.text.DisplayFill;
 import team.terrafirmagreg.exporter.contract.text.LangAdditions;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
 import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
+import team.terrafirmagreg.exporter.dump.io.DumpJson;
 import team.terrafirmagreg.exporter.engine.run.RunScope;
 import team.terrafirmagreg.exporter.engine.run.RunTasks;
 import team.terrafirmagreg.exporter.engine.spec.options.ModIdFilter;
 import team.terrafirmagreg.exporter.util.ExportLog;
+import tools.jackson.databind.node.ObjectNode;
 
 @UtilityClass
 public class LangDump {
@@ -144,9 +146,6 @@ public class LangDump {
                 totalKeys += strings.size();
             }
         }
-        for (Map.Entry<String, Map<String, String>> entry : mergedLangs.entrySet()) {
-            layout.writeJson(new ArtifactAddress.Root("lang/" + entry.getKey()), entry.getValue());
-        }
         writeKeybinds(layout, keybinds);
         ObjectLinkedOpenHashSet<String> mods = new ObjectLinkedOpenHashSet<>(namespaceLanguages.keySet());
         Set<String> keybindNamespaces = new TreeSet<>();
@@ -165,7 +164,9 @@ public class LangDump {
         if (layout == null || merged.isEmpty()) {
             return;
         }
-        layout.writeJson(new ArtifactAddress.Root("keybinds"), merged);
+        layout.writeNdjson(
+                new ArtifactAddress.Root("keybinds.ndjson"),
+                (ObjectNode) DumpJson.mapper().valueToTree(merged));
     }
 
     private static String keybindOwner(String name, Set<String> namespaces) {

@@ -2,6 +2,7 @@ package team.terrafirmagreg.exporter.dump.transaction;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -11,6 +12,7 @@ import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
 import team.terrafirmagreg.exporter.dump.artifact.ArtifactCatalogBuilder;
 import team.terrafirmagreg.exporter.dump.artifact.ArtifactDescriptor;
 import team.terrafirmagreg.exporter.dump.io.ArtifactAddressRenderer;
+import team.terrafirmagreg.exporter.dump.io.DumpHashes;
 import team.terrafirmagreg.exporter.dump.transaction.DumpTransaction.State;
 
 class ArtifactWriterTest {
@@ -49,6 +51,28 @@ class ArtifactWriterTest {
         assertArrayEquals(json("new"), Files.readAllBytes(root.resolve("registry/items/tfc.json")));
         assertEquals(1, catalog.snapshot().size());
         assertEquals(json("new").length, catalog.snapshot().require(address).size());
+    }
+
+    @Test
+    void failedStreamWritePreservesPriorArtifactAndCatalog() throws Exception {
+        ArtifactCatalogBuilder catalog = new ArtifactCatalogBuilder();
+        ArtifactWriter writer = new ArtifactWriter(new ArtifactAddressRenderer(root), catalog, new TransactionState());
+        ArtifactAddress address = new ArtifactAddress.Root("table");
+        ArtifactDescriptor prior = writer.write(address, json("old"), "application/json");
+        assertThrows(
+                IOException.class,
+                () -> writer.write(address, "application/json", out -> {
+                    out.write(json("partial"));
+                    throw new IOException("encoder failed");
+                }));
+        assertArrayEquals(json("old"), Files.readAllBytes(root.resolve("table.json")));
+        assertEquals(prior, catalog.snapshot().require(address));
+        try (var files = Files.list(root)) {
+            assertEquals(1, files.count());
+        }
+        ArtifactDescriptor next = writer.write(address, "application/json", out -> out.write(json("new")));
+        assertEquals(json("new").length, next.size());
+        assertEquals(DumpHashes.sha256(json("new")), next.sha256());
     }
 
     @Test

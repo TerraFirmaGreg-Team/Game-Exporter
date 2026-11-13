@@ -299,7 +299,9 @@ class RegistryWrites {
             }
         }
         if (!merged.isEmpty()) {
-            layout.writeJson(new ArtifactAddress.Root("registry/" + DataPaths.GROUPS), merged);
+            layout.writeNdjson(
+                    new ArtifactAddress.Root("registry/" + DataPaths.GROUPS + ".ndjson"),
+                    (ObjectNode) DumpJson.mapper().valueToTree(merged));
         }
     }
 }

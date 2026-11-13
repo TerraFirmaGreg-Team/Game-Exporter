@@ -20,7 +20,7 @@ public final class ArtifactAddressRenderer {
         return prefix
                 + switch (asset.kind()) {
                     case LANGUAGE -> "lang/" + stripJson(asset.canonicalId()) + ".json";
-                    case KEYBINDS -> "keybinds.json";
+                    case KEYBINDS -> "keybinds.ndjson";
                     case TEXTURE -> texturePath(asset);
                     case MODEL -> modelPath(asset);
                 };

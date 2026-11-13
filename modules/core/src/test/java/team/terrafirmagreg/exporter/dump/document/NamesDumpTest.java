@@ -2,6 +2,7 @@ package team.terrafirmagreg.exporter.dump.document;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -141,10 +142,13 @@ class NamesDumpTest {
     }
 
     private Map<String, String> readNames(String lang) throws Exception {
-        JsonNode tree = DumpJson.readTree(root.resolve("names/" + lang + ".json"));
         Map<String, String> out = new TreeMap<>();
-        for (Map.Entry<String, JsonNode> entry : tree.properties()) {
-            out.put(entry.getKey(), entry.getValue().asString());
+        for (String line : Files.readAllLines(root.resolve("names/" + lang + ".ndjson"))) {
+            if (line.isBlank()) {
+                continue;
+            }
+            JsonNode row = DumpJson.readTree(line);
+            row.properties().forEach(entry -> out.put(entry.getKey(), entry.getValue().asString()));
         }
         return out;
     }

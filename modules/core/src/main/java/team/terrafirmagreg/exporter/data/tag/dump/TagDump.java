@@ -36,8 +36,9 @@ public class TagDump {
             List<String> producedBy = tagEntry != null ? tagEntry.producedBy() : List.of();
             out.put(e.getKey(), new TagEntry(id, parsed.registry, replace, members, usedBy, producedBy));
         }
-        layout.writeJson(new ArtifactAddress.Root("registry/tags"), EdgeTable.intern((ObjectNode)
-                DumpJson.mapper().valueToTree(out)));
+        layout.writeNdjson(
+                new ArtifactAddress.Root("registry/tags.ndjson"),
+                EdgeTable.intern((ObjectNode) DumpJson.mapper().valueToTree(out)));
     }
 
     public static String dumpId(String registry, String tagId) {

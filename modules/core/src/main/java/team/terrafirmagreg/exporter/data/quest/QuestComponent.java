@@ -1,6 +1,7 @@
 package team.terrafirmagreg.exporter.data.quest;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -10,6 +11,8 @@ import team.terrafirmagreg.exporter.assets.texture.TextureStageKeys;
 import team.terrafirmagreg.exporter.contract.text.LangAdditions;
 import team.terrafirmagreg.exporter.data.quest.dump.ChapterImageStamp;
 import team.terrafirmagreg.exporter.data.quest.dump.QuestDump;
+import team.terrafirmagreg.exporter.data.quest.dump.QuestFilterItems;
+import team.terrafirmagreg.exporter.data.registry.RegistryChannels;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
 import team.terrafirmagreg.exporter.engine.demand.ResourceDemand;
 import team.terrafirmagreg.exporter.engine.graph.ExportComponent;
@@ -29,6 +32,7 @@ import team.terrafirmagreg.exporter.spi.SourceSet;
 
 public final class QuestComponent implements ExportComponent {
     private static final String CHAPTER_IMAGES_NODE = "data.quests.chapter-images";
+    private static final String FILTER_ITEMS_NODE = "data.quests.filter-items";
     private final SourceSet<QuestSource> sources = new SourceSet<>("quests", MergePolicy.FIRST_AVAILABLE);
     private final Map<QuestSource, QuestNormalize> normalizers = new IdentityHashMap<>();
 
@@ -55,17 +59,29 @@ public final class QuestComponent implements ExportComponent {
 
     @Override
     public List<PlanNode> nodes(NodeContext context) {
-        if (!context.selected(ComponentKeys.ASSETS_TEXTURES)
-                || context.component(ComponentKeys.ASSETS_TEXTURES) == null) {
-            return List.of();
+        List<PlanNode> nodes = new ArrayList<>();
+        if (context.selected(ComponentKeys.ASSETS_TEXTURES)
+                && context.component(ComponentKeys.ASSETS_TEXTURES) != null) {
+            nodes.add(PlanNode.builder(
+                            CHAPTER_IMAGES_NODE, ctx -> ChapterImageStamp.stampChapterImages(context.layout()))
+                    .lane(Lane.IO)
+                    .input(ComponentOutputs.QUESTS)
+                    .input(TextureStageKeys.COPIED)
+                    .build());
         }
-        PlanNode stamp = PlanNode.builder(
-                        CHAPTER_IMAGES_NODE, ctx -> ChapterImageStamp.stampChapterImages(context.layout()))
-                .lane(Lane.IO)
-                .input(ComponentOutputs.QUESTS)
-                .input(TextureStageKeys.COPIED)
-                .build();
-        return List.of(stamp);
+        if (context.selected(ComponentKeys.DATA_ITEMS)
+                && context.component(ComponentKeys.DATA_ITEMS) != null) {
+            nodes.add(PlanNode.builder(
+                            FILTER_ITEMS_NODE,
+                            ctx -> QuestFilterItems.stampFilterItems(
+                                    context.layout(),
+                                    ctx.findMerged(RegistryChannels.ITEMS).orElse(List.of())))
+                    .lane(Lane.IO)
+                    .input(ComponentOutputs.QUESTS)
+                    .input(ComponentOutputs.ITEMS)
+                    .build());
+        }
+        return List.copyOf(nodes);
     }
 
     @Override

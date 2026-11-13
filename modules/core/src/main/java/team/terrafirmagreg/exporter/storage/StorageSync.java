@@ -1,10 +1,14 @@
 package team.terrafirmagreg.exporter.storage;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -15,16 +19,24 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import lombok.experimental.UtilityClass;
+import team.terrafirmagreg.exporter.contract.dto.storage.ArtifactDescriptor;
 import team.terrafirmagreg.exporter.contract.dto.storage.ObjectsIndex;
+import team.terrafirmagreg.exporter.contract.dto.storage.PublishedSnapshot;
 import team.terrafirmagreg.exporter.contract.dto.storage.VersionsIndex;
 import team.terrafirmagreg.exporter.dump.DumpFiles;
-import team.terrafirmagreg.exporter.dump.DumpLayout;
+import team.terrafirmagreg.exporter.dump.io.Compression;
+import team.terrafirmagreg.exporter.dump.io.DocumentCodec;
+import team.terrafirmagreg.exporter.dump.io.DocumentTranscoder;
 import team.terrafirmagreg.exporter.dump.io.DumpHashes;
 import team.terrafirmagreg.exporter.dump.io.DumpJson;
+import team.terrafirmagreg.exporter.dump.io.EncodingPolicy;
+import team.terrafirmagreg.exporter.storage.StorageTarget.StoredValue;
 import team.terrafirmagreg.exporter.util.ExportLog;
 import team.terrafirmagreg.exporter.util.VersionOrder;
+import tools.jackson.core.JacksonException;
 
 @UtilityClass
 public class StorageSync {
@@ -32,82 +44,157 @@ public class StorageSync {
     public static final String OBJECTS_INDEX = "objects.json";
     private static final String CACHE_OBJECT = "public, max-age=31536000, immutable";
     private static final String CACHE_RESOLVER = "public, max-age=60";
-    private static final int INDEX_PUTS = 2;
+    private static final int CAS_ATTEMPTS = 8;
 
     public record Stats(int uploaded, int skipped, int deleted, long bytes) {}
 
-    private record Entry(Path source, String key, boolean gzip, boolean object) {}
+    private record Entry(Path source, String key, boolean gzip, String contentType) {}
 
     public static Stats sync(StorageTarget target, StorageJob job) throws IOException {
         StorageOptions options = job.options();
+        EncodingPolicy policy = options.encoding();
         String packPrefix = job.packPrefix();
         String segmentPrefix = job.segmentPrefix();
-        List<Path> files = walkFiles(job.root());
-        Map<String, String> index = new TreeMap<>();
-        List<Entry> plan = new ArrayList<>(files.size());
-        for (Path file : files) {
+
+        Map<String, Path> sources = new TreeMap<>();
+        for (Path file : walkFiles(job.root())) {
             String rel = relativize(job.root(), file);
-            if (rel == null) {
-                continue;
+            if (rel != null) {
+                sources.put(rel, file);
             }
-            if (rel.equals(DumpLayout.MANIFEST)) {
-                index.put(rel, segmentPrefix + rel + ".gz");
-                plan.add(new Entry(file, segmentPrefix + rel + ".gz", true, false));
-                continue;
-            }
-            String namespace = namespaceOf(rel);
-            boolean object = options.dedup() && namespace != null;
-            String key;
-            boolean gzip;
-            if (object) {
-                String ext = DumpFiles.extension(rel);
-                String suffix = ext.isEmpty() ? "" : "." + ext;
-                gzip = rel.endsWith(".json") || rel.endsWith(".ndjson");
-                if (gzip) {
-                    suffix += ".gz";
-                }
-                key = packPrefix + "objects/" + namespace + "/" + DumpHashes.sha256(file) + suffix;
-            } else {
-                gzip = gzipInline(rel);
-                key = segmentPrefix + rel + (gzip ? ".gz" : "");
-            }
-            index.put(rel, key);
-            plan.add(new Entry(file, key, gzip, object));
         }
-        Set<String> existingObjects = options.dedup() ? Set.copyOf(target.listKeys(packPrefix + "objects/")) : Set.of();
-        AtomicInteger uploaded = new AtomicInteger();
-        AtomicInteger skipped = new AtomicInteger();
-        AtomicInteger bytes = new AtomicInteger();
-        AtomicInteger errors = new AtomicInteger();
-        try (ExecutorService pool = Executors.newFixedThreadPool(Math.max(1, options.concurrency()))) {
-            List<Future<?>> futures = new ArrayList<>(plan.size());
-            for (Entry entry : plan) {
-                futures.add(pool.submit(() -> {
-                    try {
-                        if (entry.object() && existingObjects.contains(entry.key())) {
-                            skipped.incrementAndGet();
-                            return;
-                        }
-                        byte[] payload = entry.gzip()
-                                ? gzip(Files.readAllBytes(entry.source()))
-                                : Files.readAllBytes(entry.source());
-                        putWithRetry(target, entry.key(), payload);
-                        uploaded.incrementAndGet();
-                        bytes.addAndGet(payload.length);
-                    } catch (IOException e) {
-                        errors.incrementAndGet();
-                        throw new UncheckedIOException(e);
+
+        Set<String> unmatched = new TreeSet<>(policy.overrides().keySet());
+        unmatched.removeAll(sources.keySet());
+        if (!unmatched.isEmpty()) {
+            throw new IOException("storage.tableCodecs paths not present in dump: " + unmatched);
+        }
+
+        Path staging = Files.createTempDirectory("storage-sync-encode");
+        try {
+            Map<String, ArtifactDescriptor> artifacts = new TreeMap<>();
+            Map<String, Path> encoded = new TreeMap<>();
+            for (Map.Entry<String, Path> source : sources.entrySet()) {
+                String rel = source.getKey();
+                DocumentCodec sourceCodec = DocumentCodec.sourceFor(rel);
+                DocumentCodec codec = policy.codecFor(rel);
+                Compression compression =
+                        codec == DocumentCodec.BINARY ? Compression.NONE : policy.compression();
+                Path raw = source.getValue();
+                if (codec != sourceCodec) {
+                    Path out = Files.createTempFile(staging, "encoded-", ".tmp");
+                    try (InputStream in = Files.newInputStream(raw);
+                            OutputStream output = Files.newOutputStream(out)) {
+                        DocumentTranscoder.transcode(in, sourceCodec, output, codec);
                     }
-                }));
+                    raw = out;
+                }
+                encoded.put(rel, raw);
+                artifacts.put(
+                        rel,
+                        new ArtifactDescriptor(
+                                DumpHashes.sha256(raw),
+                                Files.size(raw),
+                                toDtoCodec(codec),
+                                toDtoCompression(compression)));
             }
-            joinAll(futures);
+            String revision = DumpHashes.sha256(DumpJson.toCanonicalJsonBytes(artifacts));
+            String snapshotPrefix = segmentPrefix + "revisions/" + revision + "/";
+            String indexKey = snapshotPrefix + OBJECTS_INDEX + ".gz";
+
+            Map<String, String> index = new TreeMap<>();
+            List<Entry> plan = new ArrayList<>(sources.size());
+            for (Map.Entry<String, Path> source : sources.entrySet()) {
+                String rel = source.getKey();
+                ArtifactDescriptor artifact = artifacts.get(rel);
+                boolean gzip = artifact.compression() == ArtifactDescriptor.Compression.GZIP;
+                String key = payloadKey(packPrefix, snapshotPrefix, rel, artifact, options.dedup());
+                index.put(rel, key);
+                plan.add(new Entry(encoded.get(rel), key, gzip, mediaType(key, artifact.codec())));
+            }
+
+            Set<String> existing = new TreeSet<>();
+            existing.addAll(target.listKeys(snapshotPrefix));
+            if (options.dedup()) {
+                existing.addAll(target.listKeys(packPrefix + "objects/"));
+            }
+
+            AtomicInteger uploaded = new AtomicInteger();
+            AtomicInteger skipped = new AtomicInteger();
+            AtomicInteger bytes = new AtomicInteger();
+            try (ExecutorService pool = Executors.newFixedThreadPool(Math.max(1, options.concurrency()))) {
+                List<Future<?>> futures = new ArrayList<>(plan.size());
+                for (Entry entry : plan) {
+                    if (existing.contains(entry.key())) {
+                        skipped.incrementAndGet();
+                        continue;
+                    }
+                    futures.add(pool.submit(() -> {
+                        try {
+                            byte[] raw = Files.readAllBytes(entry.source());
+                            byte[] payload = entry.gzip() ? gzip(raw) : raw;
+                            putWithRetry(target, entry.key(), payload, entry.contentType(), CACHE_OBJECT);
+                            uploaded.incrementAndGet();
+                            bytes.addAndGet(payload.length);
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+                    }));
+                }
+                joinAll(futures);
+            }
+
+            if (existing.contains(indexKey)) {
+                skipped.incrementAndGet();
+            } else {
+                ObjectsIndex objectsIndex = new ObjectsIndex(index, artifacts);
+                putWithRetry(
+                        target,
+                        indexKey,
+                        gzip(DumpJson.toCanonicalJsonBytes(objectsIndex)),
+                        "application/json",
+                        CACHE_OBJECT);
+                uploaded.incrementAndGet();
+            }
+
+            VersionsIndex merged = publishPointer(target, job, revision, indexKey);
+            uploaded.incrementAndGet();
+
+            AtomicInteger deleted = new AtomicInteger();
+            if (options.delete()) {
+                String revisionsPrefix = segmentPrefix + "revisions/";
+                for (String key : target.listKeys(segmentPrefix)) {
+                    if (!key.startsWith(revisionsPrefix)) {
+                        target.delete(key);
+                        deleted.incrementAndGet();
+                    }
+                }
+                LiveKeys live = liveKeys(target, packPrefix, segmentPrefix, merged);
+                if (live != null) {
+                    for (String key : target.listKeys(revisionsPrefix)) {
+                        String rest = key.substring(revisionsPrefix.length());
+                        int slash = rest.indexOf('/');
+                        if (slash < 0) {
+                            continue;
+                        }
+                        if (!live.revisions().contains(rest.substring(0, slash))) {
+                            target.delete(key);
+                            deleted.incrementAndGet();
+                        }
+                    }
+                    for (String key : target.listKeys(packPrefix + "objects/")) {
+                        if (!live.objects().contains(key)) {
+                            target.delete(key);
+                            deleted.incrementAndGet();
+                        }
+                    }
+                }
+            }
+
+            return new Stats(uploaded.get(), skipped.get(), deleted.get(), bytes.get());
+        } finally {
+            DumpFiles.deleteRecursively(staging);
         }
-        Map<String, String> indexView = new TreeMap<>(index);
-        byte[] indexBytes = DumpJson.toCanonicalJsonBytes(new ObjectsIndex(indexView));
-        target.put(segmentPrefix + OBJECTS_INDEX + ".gz", gzip(indexBytes), "application/json", CACHE_RESOLVER);
-        writeVersionsIndex(target, job);
-        int deleted = deleteOrphans(target, job, plan, segmentPrefix, options.delete());
-        return new Stats(uploaded.get() + INDEX_PUTS, skipped.get(), deleted, bytes.get());
     }
 
     private static List<Path> walkFiles(Path root) throws IOException {
@@ -137,8 +224,31 @@ public class StorageSync {
         return second > first + 1 ? rel.substring(first + 1, second) : null;
     }
 
-    private static boolean gzipInline(String rel) {
-        return (rel.endsWith(".json") || rel.endsWith(".ndjson")) && !rel.equals("manifest.json");
+    private static ArtifactDescriptor.Codec toDtoCodec(DocumentCodec codec) {
+        return ArtifactDescriptor.Codec.valueOf(codec.name());
+    }
+
+    private static ArtifactDescriptor.Compression toDtoCompression(Compression compression) {
+        return ArtifactDescriptor.Compression.valueOf(compression.name());
+    }
+
+    private static String emittedPath(String rel, ArtifactDescriptor artifact) {
+        if (artifact.codec() == ArtifactDescriptor.Codec.BINARY) {
+            return rel;
+        }
+        return DumpFiles.stripExtension(rel) + "." + artifact.codec().id();
+    }
+
+    private static String payloadKey(
+            String packPrefix, String snapshotPrefix, String rel, ArtifactDescriptor artifact, boolean dedup) {
+        String namespace = dedup ? namespaceOf(rel) : null;
+        String gzip = artifact.compression() == ArtifactDescriptor.Compression.GZIP ? ".gz" : "";
+        if (namespace != null) {
+            String ext = DumpFiles.extension(emittedPath(rel, artifact));
+            return packPrefix + "objects/" + namespace + "/" + artifact.sha256()
+                    + (ext.isEmpty() ? "" : "." + ext) + gzip;
+        }
+        return snapshotPrefix + emittedPath(rel, artifact) + gzip;
     }
 
     private static byte[] gzip(byte[] raw) throws IOException {
@@ -149,88 +259,146 @@ public class StorageSync {
         return out.toByteArray();
     }
 
-    private static String mediaType(String key) {
-        if (key.endsWith(".webp")) {
-            return "image/webp";
-        }
-        if (key.endsWith(".glb")) {
-            return "model/gltf-binary";
-        }
-        if (key.endsWith(".ndjson") || key.endsWith(".ndjson.gz")) {
-            return "application/x-ndjson";
-        }
-        return "application/json";
+    private static String mediaType(String key, ArtifactDescriptor.Codec codec) {
+        return switch (codec) {
+            case JSON -> "application/json";
+            case NDJSON -> "application/x-ndjson";
+            case BINARY -> {
+                if (key.endsWith(".webp")) {
+                    yield "image/webp";
+                }
+                if (key.endsWith(".glb")) {
+                    yield "model/gltf-binary";
+                }
+                yield "application/octet-stream";
+            }
+        };
     }
 
-    private static String cacheControl(String key) {
-        return key.contains("/objects/") ? CACHE_OBJECT : CACHE_RESOLVER;
+    private record LiveKeys(Set<String> revisions, Set<String> objects) {}
+
+    private static LiveKeys liveKeys(
+            StorageTarget target, String packPrefix, String segmentPrefix, VersionsIndex merged) {
+        String revisionsPrefix = segmentPrefix + "revisions/";
+        Set<String> revisions = new TreeSet<>();
+        Set<String> objects = new TreeSet<>();
+        for (PublishedSnapshot snapshot : merged.snapshots().values()) {
+            String indexKey = snapshot.index();
+            if (indexKey == null || !indexKey.startsWith(revisionsPrefix)) {
+                return null;
+            }
+            int end = indexKey.indexOf('/', revisionsPrefix.length());
+            if (end < 0) {
+                return null;
+            }
+            revisions.add(indexKey.substring(revisionsPrefix.length(), end));
+            StoredValue stored;
+            try {
+                stored = target.readForUpdate(indexKey);
+            } catch (IOException e) {
+                return null;
+            }
+            if (stored == null || stored.bytes() == null) {
+                return null;
+            }
+            ObjectsIndex index;
+            try {
+                index = DumpJson.mapper().readValue(gunzip(stored.bytes()), ObjectsIndex.class);
+            } catch (JacksonException | IOException e) {
+                return null;
+            }
+            if (index == null || index.files() == null) {
+                return null;
+            }
+            for (String key : index.files().values()) {
+                if (key != null && key.startsWith(packPrefix + "objects/")) {
+                    objects.add(key);
+                }
+            }
+        }
+        return new LiveKeys(revisions, objects);
     }
 
-    private static void writeVersionsIndex(StorageTarget target, StorageJob job) throws IOException {
+    private static byte[] gunzip(byte[] payload) throws IOException {
+        try (GZIPInputStream in = new GZIPInputStream(new ByteArrayInputStream(payload));
+                ByteArrayOutputStream out = new ByteArrayOutputStream(payload.length * 3)) {
+            in.transferTo(out);
+            return out.toByteArray();
+        }
+    }
+
+    private static VersionsIndex publishPointer(StorageTarget target, StorageJob job, String revision, String indexKey)
+            throws IOException {
         String key = job.packPrefix() + VERSIONS;
-        VersionsIndex current = readVersionsIndex(target, key);
+        for (int attempt = 0; attempt < CAS_ATTEMPTS; attempt++) {
+            StoredValue current = target.readForUpdate(key);
+            VersionsIndex merged = mergeVersions(job, readVersions(current), revision, indexKey);
+            if (target.compareAndPut(
+                    key,
+                    current == null ? null : current.token(),
+                    DumpJson.toCanonicalJsonBytes(merged),
+                    "application/json",
+                    CACHE_RESOLVER)) {
+                return merged;
+            }
+        }
+        throw new IOException("versions.json CAS failed after " + CAS_ATTEMPTS + " attempts: " + key);
+    }
+
+    private static VersionsIndex readVersions(StoredValue current) throws IOException {
+        if (current == null || current.bytes() == null || current.bytes().length == 0) {
+            return new VersionsIndex(null, null, List.of(), Map.of());
+        }
+        try {
+            VersionsIndex parsed = DumpJson.mapper().readValue(current.bytes(), VersionsIndex.class);
+            if (parsed == null) {
+                return new VersionsIndex(null, null, List.of(), Map.of());
+            }
+            return parsed;
+        } catch (JacksonException e) {
+            throw new IOException("Corrupt versions.json pointer", e);
+        }
+    }
+
+    private static VersionsIndex mergeVersions(
+            StorageJob job, VersionsIndex current, String revision, String indexKey) {
+        String segment = job.segment();
+        Map<String, PublishedSnapshot> snapshots = new TreeMap<>(current.snapshots());
+        snapshots.remove("latest");
+        if (!"latest".equals(segment)) {
+            PublishedSnapshot prior = snapshots.get(segment);
+            String publishedAt = prior != null && revision.equals(prior.revision())
+                    ? prior.publishedAt()
+                    : Instant.now().toString();
+            snapshots.put(segment, new PublishedSnapshot(revision, publishedAt, indexKey));
+        }
         TreeSet<String> versions = new TreeSet<>(VersionOrder::compare);
-        versions.addAll(current.versions());
-        if (!"latest".equals(job.segment())) {
-            versions.add(job.segment());
+        for (String version : current.versions()) {
+            if (snapshots.containsKey(version)) {
+                versions.add(version);
+            }
+        }
+        if (!"latest".equals(segment)) {
+            versions.add(segment);
         }
         String latest;
-        if (job.options().updateLatest() && !"latest".equals(job.segment())) {
-            TreeSet<String> candidates = new TreeSet<>(VersionOrder::compare);
-            candidates.addAll(versions);
-            if (current.latest() != null) {
-                candidates.add(current.latest());
-            }
-            latest = candidates.isEmpty() ? job.segment() : candidates.last();
+        if (job.options().updateLatest() && !versions.isEmpty()) {
+            latest = versions.last();
+        } else if (current.latest() != null && versions.contains(current.latest())) {
+            latest = current.latest();
         } else {
-            latest = current.latest() != null ? current.latest() : job.segment();
+            latest = versions.isEmpty() ? null : versions.last();
         }
-        target.put(
-                key,
-                DumpJson.toCanonicalJsonBytes(new VersionsIndex(job.packId(), latest, List.copyOf(versions))),
-                "application/json",
-                CACHE_RESOLVER);
+        return new VersionsIndex(job.packId(), latest, List.copyOf(versions), snapshots);
     }
 
-    private static VersionsIndex readVersionsIndex(StorageTarget target, String key) {
-        try {
-            byte[] raw = target.get(key);
-            if (raw != null) {
-                return DumpJson.mapper().readValue(raw, VersionsIndex.class);
-            }
-        } catch (Exception ignored) {
-        }
-        return new VersionsIndex(null, null, List.of());
-    }
-
-    private static int deleteOrphans(
-            StorageTarget target, StorageJob job, List<Entry> plan, String segmentPrefix, boolean enabled)
+    private static void putWithRetry(
+            StorageTarget target, String key, byte[] payload, String contentType, String cacheControl)
             throws IOException {
-        if (!enabled) {
-            return 0;
-        }
-        Set<String> planned = new TreeSet<>();
-        for (Entry entry : plan) {
-            if (!entry.object()) {
-                planned.add(entry.key());
-            }
-        }
-        planned.add(segmentPrefix + OBJECTS_INDEX + ".gz");
-        int deleted = 0;
-        for (String remote : target.listKeys(segmentPrefix)) {
-            if (!planned.contains(remote)) {
-                target.delete(remote);
-                deleted++;
-            }
-        }
-        return deleted;
-    }
-
-    private static void putWithRetry(StorageTarget target, String key, byte[] payload) throws IOException {
         IOException last = null;
         for (int attempt = 0; attempt < 4; attempt++) {
             try {
-                target.put(key, payload, mediaType(key), cacheControl(key));
+                target.put(key, payload, contentType, cacheControl);
                 return;
             } catch (IOException e) {
                 last = e;

@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.xml.XMLConstants;
@@ -20,6 +21,7 @@ import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 import team.terrafirmagreg.exporter.storage.RequestCounts;
+import team.terrafirmagreg.exporter.storage.StorageTarget;
 
 public final class S3Client {
     private static final Duration TIMEOUT = Duration.ofSeconds(120);
@@ -63,6 +65,51 @@ public final class S3Client {
             throw new IOException("S3 GET failed " + response.statusCode() + " for " + key + ": " + bodyText(response));
         }
         return response.body();
+    }
+
+    public StorageTarget.StoredValue getForUpdate(String key) throws IOException {
+        requests.increment("GET");
+        HttpResponse<byte[]> response = execute("GET", key, null, null, Map.of());
+        if (response.statusCode() == 404) {
+            return null;
+        }
+        if (response.statusCode() / 100 != 2) {
+            throw new IOException("S3 GET failed " + response.statusCode() + " for " + key + ": " + bodyText(response));
+        }
+        String etag = response.headers().firstValue("ETag").orElse(null);
+        if (etag == null || etag.isBlank()) {
+            throw new IOException("S3 GET missing ETag for " + key);
+        }
+        return new StorageTarget.StoredValue(response.body(), etag);
+    }
+
+    public boolean compareAndPut(
+            String key,
+            @Nullable String expectedToken,
+            byte[] payload,
+            String contentType,
+            @Nullable String cacheControl)
+            throws IOException {
+        Map<String, String> headers = new LinkedHashMap<>();
+        headers.put("Content-Type", contentType);
+        if (cacheControl != null) {
+            headers.put("Cache-Control", cacheControl);
+        }
+        if (expectedToken == null) {
+            headers.put("If-None-Match", "*");
+        } else {
+            headers.put("If-Match", expectedToken);
+        }
+        requests.increment("CAS");
+        HttpResponse<byte[]> response = execute("PUT", key, null, payload, headers);
+        int status = response.statusCode();
+        if (status == 409 || status == 412) {
+            return false;
+        }
+        if (status / 100 != 2) {
+            throw new IOException("S3 CAS PUT failed " + status + " for " + key + ": " + bodyText(response));
+        }
+        return true;
     }
 
     public void delete(String key) throws IOException {

@@ -37,8 +37,8 @@ public class DataPaths {
 
     private static String recipeRelative(String categoryPath) {
         String path = DumpPaths.requireResourcePath(categoryPath);
-        if (!path.endsWith(".json")) {
-            path = path + ".json";
+        if (!path.endsWith(".json") && !path.endsWith(".ndjson")) {
+            path = path + ".ndjson";
         }
         return RECIPES + "/" + path;
     }

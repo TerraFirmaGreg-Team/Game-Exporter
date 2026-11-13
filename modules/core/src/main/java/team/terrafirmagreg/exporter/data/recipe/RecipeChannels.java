@@ -6,6 +6,10 @@ import team.terrafirmagreg.exporter.engine.graph.MergeKey;
 import team.terrafirmagreg.exporter.engine.graph.MergeOps;
 
 public final class RecipeChannels {
+    public static final MergeKey<RecipeProjection> PROJECTION =
+            MergeKey.of("data.recipes.projection", RecipeProjection.class, (a, b) -> {
+                throw new IllegalStateException("Recipe projection already produced");
+            });
     public static final MergeKey<Map<String, RecipeEntry>> BY_ID =
             MergeKey.of("data.recipes.byId", Map.class, MergeOps::mergeMaps);
 

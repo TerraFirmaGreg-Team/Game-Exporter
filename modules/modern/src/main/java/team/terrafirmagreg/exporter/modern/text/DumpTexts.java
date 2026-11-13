@@ -129,11 +129,21 @@ public class DumpTexts {
     }
 
     private static final Map<Integer, Character> LEGACY_COLORS = Map.ofEntries(
-            Map.entry(0x000000, '0'), Map.entry(0x0000AA, '1'), Map.entry(0x00AA00, '2'),
-            Map.entry(0x00AAAA, '3'), Map.entry(0xAA0000, '4'), Map.entry(0xAA00AA, '5'),
-            Map.entry(0xFFAA00, '6'), Map.entry(0xAAAAAA, '7'), Map.entry(0x555555, '8'),
-            Map.entry(0x5555FF, '9'), Map.entry(0x55FF55, 'a'), Map.entry(0x55FFFF, 'b'),
-            Map.entry(0xFF5555, 'c'), Map.entry(0xFF55FF, 'd'), Map.entry(0xFFFF55, 'e'),
+            Map.entry(0x000000, '0'),
+            Map.entry(0x0000AA, '1'),
+            Map.entry(0x00AA00, '2'),
+            Map.entry(0x00AAAA, '3'),
+            Map.entry(0xAA0000, '4'),
+            Map.entry(0xAA00AA, '5'),
+            Map.entry(0xFFAA00, '6'),
+            Map.entry(0xAAAAAA, '7'),
+            Map.entry(0x555555, '8'),
+            Map.entry(0x5555FF, '9'),
+            Map.entry(0x55FF55, 'a'),
+            Map.entry(0x55FFFF, 'b'),
+            Map.entry(0xFF5555, 'c'),
+            Map.entry(0xFF55FF, 'd'),
+            Map.entry(0xFFFF55, 'e'),
             Map.entry(0xFFFFFF, 'f'));
 
     private static String styleCodes(Style style) {

@@ -7,6 +7,8 @@ import lombok.experimental.UtilityClass;
 import team.terrafirmagreg.exporter.contract.dto.recipe.RecipeCategory;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
 import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
+import team.terrafirmagreg.exporter.dump.io.DumpJson;
+import tools.jackson.databind.node.ObjectNode;
 
 @UtilityClass
 public class CategoryDump {
@@ -28,6 +30,8 @@ public class CategoryDump {
                                     category.workstations(),
                                     category.layout()));
         }
-        layout.writeJson(new ArtifactAddress.Root("registry/recipe_categories"), out);
+        layout.writeNdjson(
+                new ArtifactAddress.Root("registry/recipe_categories.ndjson"),
+                (ObjectNode) DumpJson.mapper().valueToTree(out));
     }
 }

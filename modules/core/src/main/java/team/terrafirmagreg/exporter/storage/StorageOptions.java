@@ -1,6 +1,12 @@
 package team.terrafirmagreg.exporter.storage;
 
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 import team.terrafirmagreg.exporter.config.pack.Storage;
+import team.terrafirmagreg.exporter.dump.io.Compression;
+import team.terrafirmagreg.exporter.dump.io.DocumentCodec;
+import team.terrafirmagreg.exporter.dump.io.EncodingPolicy;
 
 public record StorageOptions(
         String type,
@@ -13,7 +19,39 @@ public record StorageOptions(
         boolean delete,
         boolean updateLatest,
         boolean dedup,
-        int concurrency) {
+        int concurrency,
+        EncodingPolicy encoding) {
+
+    public StorageOptions {
+        Objects.requireNonNull(encoding, "encoding");
+    }
+
+    public StorageOptions(
+            String type,
+            String dir,
+            String endpoint,
+            String bucket,
+            String prefix,
+            String region,
+            boolean pathStyle,
+            boolean delete,
+            boolean updateLatest,
+            boolean dedup,
+            int concurrency) {
+        this(
+                type,
+                dir,
+                endpoint,
+                bucket,
+                prefix,
+                region,
+                pathStyle,
+                delete,
+                updateLatest,
+                dedup,
+                concurrency,
+                EncodingPolicy.defaults());
+    }
 
     public static StorageOptions of(Storage cfg) {
         return new StorageOptions(
@@ -29,7 +67,12 @@ public record StorageOptions(
                         && !"0".equals(env("DUMP_UPDATE_LATEST"))
                         && !"false".equals(env("DUMP_UPDATE_LATEST")),
                 cfg.dedup.get(),
-                cfg.concurrency.get());
+                cfg.concurrency.get(),
+                new EncodingPolicy(
+                        DocumentCodec.parse(cfg.tableCodec.get()),
+                        cfg.tableCodecs.get().entrySet().stream()
+                                .collect(Collectors.toMap(Map.Entry::getKey, e -> DocumentCodec.parse(e.getValue()))),
+                        Compression.parse(cfg.compression.get())));
     }
 
     public boolean enabled() {

@@ -1,14 +1,14 @@
 package team.terrafirmagreg.exporter.data.recipe.dump;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.Map;
 import lombok.experimental.UtilityClass;
 import team.terrafirmagreg.exporter.contract.dto.recipe.RecipeEntry;
 import team.terrafirmagreg.exporter.contract.id.ResourceId;
-import team.terrafirmagreg.exporter.dump.DataPaths;
+import team.terrafirmagreg.exporter.data.recipe.RecipeProjection;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
 import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
+import team.terrafirmagreg.exporter.dump.io.DumpJson;
 
 @UtilityClass
 public class RecipeDump {
@@ -25,14 +25,17 @@ public class RecipeDump {
         }
     }
 
-    public static Path file(DumpLayout layout, String namespace, String categoryPath) {
-        return DataPaths.recipeFile(layout, namespace, categoryPath);
+    public static void write(DumpLayout layout, RecipeProjection projection) throws IOException {
+        for (var block : projection.blocks().entrySet()) {
+            writeBlock(layout, block.getKey(), block.getValue());
+        }
     }
 
-    public static void write(DumpLayout layout, String namespace, String categoryPath, Map<String, RecipeEntry> recipes)
+    public static void writeBlock(DumpLayout layout, String relative, Map<String, RecipeEntry> recipes)
             throws IOException {
-        layout.writeJson(
-                new ArtifactAddress.Data(namespace, categoryPath, ArtifactAddress.DataKind.RECIPE),
-                recipes == null ? Map.of() : recipes);
+        String[] parts = relative.split("/", 4);
+        layout.write(
+                new ArtifactAddress.Data(parts[1], parts[3], ArtifactAddress.DataKind.RECIPE),
+                DumpJson.toCanonicalJsonBytes(recipes));
     }
 }

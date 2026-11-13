@@ -583,9 +583,6 @@ public class SceneCapture {
                             .add(text);
                 }
                 for (List<DrawnText> group : textGroups.values()) {
-                    // marquee/slide animations redraw the same text across frames at shifting x —
-                    // a run of 3+ copies keeps only the final-frame position; shorter runs are
-                    // distinct labels that happen to share text and row
                     if (group.size() >= 3) {
                         uniqueTexts.add(group.getLast());
                     } else {

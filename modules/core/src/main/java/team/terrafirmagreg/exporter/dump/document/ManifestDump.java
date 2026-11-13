@@ -18,21 +18,21 @@ import team.terrafirmagreg.exporter.contract.dto.meta.DumpReport;
 import team.terrafirmagreg.exporter.contract.dto.meta.ReportFiles;
 import team.terrafirmagreg.exporter.contract.dto.meta.Selection;
 import team.terrafirmagreg.exporter.contract.dto.meta.TimingEntry;
-import team.terrafirmagreg.exporter.contract.dto.recipe.RecipeEntry;
-import team.terrafirmagreg.exporter.contract.id.ResourceId;
 import team.terrafirmagreg.exporter.contract.schema.DumpSchemas;
 import team.terrafirmagreg.exporter.contract.text.Display;
 import team.terrafirmagreg.exporter.contract.text.LangKeys;
 import team.terrafirmagreg.exporter.data.recipe.RecipeChannels;
 import team.terrafirmagreg.exporter.data.recipe.RecipeEdges;
-import team.terrafirmagreg.exporter.data.recipe.RecipeKey;
-import team.terrafirmagreg.exporter.data.recipe.dump.RecipeDump;
+import team.terrafirmagreg.exporter.data.recipe.RecipeProjection;
+import team.terrafirmagreg.exporter.data.recipe.RecipeSnapshot;
+import team.terrafirmagreg.exporter.data.recipe.RecipeStageKeys;
 import team.terrafirmagreg.exporter.data.registry.RegistryChannels;
 import team.terrafirmagreg.exporter.data.registry.dump.GroupsDump;
 import team.terrafirmagreg.exporter.dump.DataPaths;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
 import team.terrafirmagreg.exporter.dump.artifact.ArtifactAddress;
 import team.terrafirmagreg.exporter.dump.artifact.ArtifactCatalog;
+import team.terrafirmagreg.exporter.dump.io.DumpJson;
 import team.terrafirmagreg.exporter.engine.report.ComponentResult;
 import team.terrafirmagreg.exporter.engine.report.ComponentResult.Status;
 import team.terrafirmagreg.exporter.engine.report.RunMetrics;
@@ -45,6 +45,7 @@ import team.terrafirmagreg.exporter.engine.spec.ExportSpec;
 import team.terrafirmagreg.exporter.engine.spec.ProductId;
 import team.terrafirmagreg.exporter.util.ExportLog;
 import team.terrafirmagreg.exporter.util.HumanFormat;
+import tools.jackson.databind.node.ObjectNode;
 
 @UtilityClass
 public class ManifestDump {
@@ -107,7 +108,7 @@ public class ManifestDump {
             return projected;
         });
         CompletableFuture<Void> recipeIndex = timed(tasks, nodes, "manifests.recipeIndexMs", () -> {
-            writeRecipeIndexes(layout, RunTasks.await(projection).recipeIndexes());
+            writeRecipeIndexes(layout, RunTasks.await(scan).projection());
             return null;
         });
         CompletableFuture<ReportFiles> stats = timed(tasks, nodes, "manifests.fileStatsMs", () -> {
@@ -258,37 +259,41 @@ public class ManifestDump {
         return dumpId.substring(0, colon + 1) + dumpId.substring(slash + 1);
     }
 
-    private record RecipeScan(Map<String, List<String>> categories, RecipeTypesIndex types) {}
+    private record RecipeScan(
+            Map<String, List<String>> categories, RecipeTypesIndex types, RecipeProjection projection) {}
 
     private static RecipeScan recipeScan(ExecutionOutputs outputs) {
         Map<String, List<String>> categories = new TreeMap<>();
-        Map<String, TypeRows> rows = new TreeMap<>();
-        for (Map.Entry<String, RecipeEntry> e :
-                outputs.findMerged(RecipeChannels.BY_ID).orElse(Map.of()).entrySet()) {
-            RecipeEntry body = e.getValue();
-            String categoryPath = RecipeDump.categoryPath(body);
-            if (categoryPath == null) {
-                continue;
-            }
-            String recipeId = RecipeKey.idOf(e.getKey());
-            String ns = ResourceId.namespaceOf(recipeId);
-            if (!ns.isEmpty()) {
-                List<String> list = categories.computeIfAbsent(recipeId, ignored -> new ArrayList<>());
-                if (!list.contains(body.category())) {
-                    list.add(body.category());
-                }
-            }
-            TypeRows row = rows.computeIfAbsent(body.category(), ignored -> new TypeRows());
-            row.count++;
-            if (!ns.isEmpty()) {
-                row.files.put(ns, DataPaths.recipeRelative(ns, categoryPath));
+        RecipeProjection projection = outputs.findMerged(RecipeChannels.PROJECTION)
+                .orElseGet(() -> {
+                    if (!outputs.findMerged(RecipeChannels.BY_ID)
+                            .orElse(Map.of())
+                            .isEmpty()) {
+                        throw new IllegalStateException("Written recipes have no prepared projection");
+                    }
+                    return RecipeProjection.build(Map.of(), Map.of());
+                });
+        var capturedLayouts = outputs.find(RecipeStageKeys.CAPTURED)
+                .map(RecipeSnapshot::layouts)
+                .orElse(Map.of());
+        for (var category : outputs.findMerged(RegistryChannels.CATEGORIES).orElse(List.of())) {
+            if (projection.categoryRows().containsKey(category.id())
+                    && category.layout() != null
+                    && !category.layout().equals(capturedLayouts.get(category.id()))) {
+                throw new IllegalStateException(
+                        "Recipe projection requires authoritative captured layout for category " + category.id());
             }
         }
-        List<RecipeTypeRow> types = new ArrayList<>(rows.size());
-        for (Map.Entry<String, TypeRows> e : rows.entrySet()) {
-            types.add(new RecipeTypeRow(e.getKey(), e.getValue().count, e.getValue().files));
-        }
-        return new RecipeScan(categories, new RecipeTypesIndex(types));
+        projection
+                .locationIndex()
+                .forEach((id, rows) -> categories.put(
+                        id, rows.stream().map(row -> row.category()).distinct().toList()));
+        List<RecipeTypeRow> types = new ArrayList<>(projection.categoryRows().size());
+        projection
+                .categoryRows()
+                .forEach((id, document) ->
+                        types.add(new RecipeTypeRow(id, document.rows().size(), RecipeProjection.rowsPath(id))));
+        return new RecipeScan(categories, new RecipeTypesIndex(types), projection);
     }
 
     private static Map<String, String> questPointers(DumpLayout layout, ArtifactCatalog catalog) {
@@ -310,11 +315,6 @@ public class ManifestDump {
             }
         }
         return namespaces;
-    }
-
-    private static final class TypeRows {
-        private int count;
-        private final Map<String, String> files = new TreeMap<>();
     }
 
     private static Map<String, String> modDisplayKeys(ExecutionOutputs outputs) {
@@ -350,14 +350,14 @@ public class ManifestDump {
         return new Selection(productIds, componentIds);
     }
 
-    private static void writeRecipeIndexes(DumpLayout layout, Map<String, Map<String, List<String>>> indexes)
-            throws IOException {
-        Map<String, List<String>> merged = new TreeMap<>();
-        for (Map<String, List<String>> rows : indexes.values()) {
-            merged.putAll(rows);
+    private static void writeRecipeIndexes(DumpLayout layout, RecipeProjection projection) throws IOException {
+        for (var category : projection.categoryRows().entrySet()) {
+            layout.writeJson(
+                    new ArtifactAddress.Root(RecipeProjection.rowsPath(category.getKey())), category.getValue());
         }
-        if (!merged.isEmpty()) {
-            layout.writeJson(new ArtifactAddress.Root("registry/recipes"), merged);
+        if (!projection.locationIndex().isEmpty()) {
+            layout.writeNdjson(new ArtifactAddress.Root("registry/recipes.ndjson"), (ObjectNode)
+                    DumpJson.mapper().valueToTree(projection.locationIndex()));
         }
     }
 }

@@ -4,6 +4,8 @@ import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Map;
 import lombok.experimental.UtilityClass;
+import team.terrafirmagreg.exporter.contract.dto.catalog.CatalogLabels;
+import team.terrafirmagreg.exporter.contract.dto.catalog.PreparedCatalog;
 import team.terrafirmagreg.exporter.contract.dto.entry.BlockEntry;
 import team.terrafirmagreg.exporter.contract.dto.entry.EntityEntry;
 import team.terrafirmagreg.exporter.contract.dto.entry.FluidEntry;
@@ -17,8 +19,10 @@ import team.terrafirmagreg.exporter.contract.dto.meta.*;
 import team.terrafirmagreg.exporter.contract.dto.quest.QuestBookData;
 import team.terrafirmagreg.exporter.contract.dto.quest.QuestChapter;
 import team.terrafirmagreg.exporter.contract.dto.quest.QuestChapterGroups;
+import team.terrafirmagreg.exporter.contract.dto.recipe.PreparedRecipeRow;
 import team.terrafirmagreg.exporter.contract.dto.recipe.RecipeCategory;
 import team.terrafirmagreg.exporter.contract.dto.recipe.RecipeEntry;
+import team.terrafirmagreg.exporter.contract.dto.recipe.RecipeRowsDocument;
 import team.terrafirmagreg.exporter.contract.dto.tab.TabEntry;
 import team.terrafirmagreg.exporter.contract.dto.tag.TagEntry;
 import tools.jackson.core.type.TypeReference;
@@ -43,7 +47,7 @@ public class DumpSchemas {
     private static final Type RECIPES = typeOf(new TypeReference<Map<String, RecipeEntry>>() {});
     private static final Type GUIDE_ENTRIES = typeOf(new TypeReference<Map<String, GuideEntry>>() {});
     private static final Type STRING_MAP = typeOf(new TypeReference<Map<String, String>>() {});
-    private static final Type STRING_LIST_MAP = typeOf(new TypeReference<Map<String, List<String>>>() {});
+    private static final Type RECIPE_LOCATIONS = typeOf(new TypeReference<Map<String, List<PreparedRecipeRow>>>() {});
 
     public static List<DumpSchema> all() {
         return List.of(
@@ -69,8 +73,11 @@ public class DumpSchemas {
                 schema("registry/tags", TAGS),
                 schema("registry/recipe_categories", RECIPE_CATEGORIES),
                 schema("registry/groups", GROUPS),
+                schema("registry/catalog", PreparedCatalog.class),
+                schema("lang/catalog", CatalogLabels.class),
                 schema("data/recipes/recipe", RECIPES),
-                schema("registry/recipes", STRING_LIST_MAP),
+                schema("data/index/recipes", RecipeRowsDocument.class),
+                schema("registry/recipes", RECIPE_LOCATIONS),
                 schema("assets/models/model", STRING_MAP),
                 schema(QUEST_DATA, QuestBookData.class),
                 schema(QUEST_CHAPTER_GROUPS, QuestChapterGroups.class),

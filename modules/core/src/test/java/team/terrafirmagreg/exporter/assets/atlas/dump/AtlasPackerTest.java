@@ -33,32 +33,22 @@ class AtlasPackerTest {
         for (Path file : write.files()) {
             assertTrue(file.getFileName().toString().endsWith(".webp"), file.toString());
             assertTrue(Files.isRegularFile(file), file.toString());
-            assertFalse(file.toString().contains("atlases"), file.toString());
+            assertTrue(file.toString().replace('\\', '/').contains("assets/atlas/"), file.toString());
         }
-        assertEquals(0, Files.exists(root.resolve("assets/mod/atlases/items.json")) ? 1 : 0);
+        assertFalse(Files.exists(root.resolve("assets/mod/atlases/items.json")));
 
         List<AtlasDocument> placements = write.placements();
-        assertFalse(placements.isEmpty());
-        AtlasDocument mod = placements.stream()
-                .filter(d -> d.namespace().equals("mod"))
-                .findFirst()
-                .orElseThrow();
-        List<String> ids = mod.sprites().stream()
+        assertEquals(1, placements.size());
+        AtlasDocument doc = placements.get(0);
+        assertEquals("atlas", doc.namespace());
+        List<String> ids = doc.sprites().stream()
                 .map(AtlasEntry::ref)
                 .map(ref -> ref.id().toString())
                 .toList();
-        assertTrue(ids.contains("mod:item/alpha"));
-        assertTrue(ids.contains("mod:item/beta"));
-        for (AtlasEntry entry : mod.sprites()) {
+        assertTrue(ids.containsAll(List.of("mod:item/alpha", "mod:item/beta", "other:block/ore")));
+        for (AtlasEntry entry : doc.sprites()) {
             assertTrue(entry.w() > 0 && entry.h() > 0);
         }
-
-        AtlasDocument other = placements.stream()
-                .filter(d -> d.namespace().equals("other"))
-                .findFirst()
-                .orElseThrow();
-        assertTrue(
-                other.sprites().stream().anyMatch(e -> e.ref().id().toString().equals("other:block/ore")));
     }
 
     private static BufferedImage image() {

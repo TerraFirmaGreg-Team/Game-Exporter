@@ -33,6 +33,7 @@ import team.terrafirmagreg.exporter.engine.run.ExecutionOutputs;
 import team.terrafirmagreg.exporter.util.snbt.CanonicalSnbt;
 import team.terrafirmagreg.exporter.util.snbt.SnbtToJson;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
 
 @UtilityClass
 public class NamesDump {
@@ -64,7 +65,9 @@ public class NamesDump {
             for (Map.Entry<String, NameTarget> target : targets.entrySet()) {
                 names.put(target.getKey(), resolve(merged, target.getValue()));
             }
-            layout.writeJson(new ArtifactAddress.Root("names/" + code), names);
+            layout.writeNdjson(
+                    new ArtifactAddress.Root("names/" + code + ".ndjson"),
+                    (ObjectNode) DumpJson.mapper().valueToTree(names));
         }
     }
 
