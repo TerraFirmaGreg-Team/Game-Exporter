@@ -112,6 +112,10 @@ public class DumpTexts {
         return sequence == null ? null : SOURCES.get(sequence);
     }
 
+    public static void clearSources() {
+        SOURCES.clear();
+    }
+
     public static DumpText sequenceOrComponent(FormattedCharSequence sequence) {
         if (sequence == null) {
             return null;

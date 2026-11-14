@@ -92,8 +92,7 @@ public class SceneCapture {
 
     public record DrawnEntity(String id, int x, int y, int w, int h, Rect clip, boolean rendered) {}
 
-    public record DrawnText(
-            int x, int y, int w, int h, DumpText payload, int color, boolean shadow, FormattedCharSequence seq) {}
+    public record DrawnText(int x, int y, int w, int h, DumpText payload, int color, boolean shadow, String plain) {}
 
     private record DrawnKey(int x, int y, Item item, CompoundTag tag) {}
 
@@ -254,8 +253,20 @@ public class SceneCapture {
             if (texts == null || !suppressed || widgetTextCovered) {
                 return;
             }
-            texts.add(new DrawnText(x - originX, y - originY, w, h, payload, color, shadow, seq));
+            texts.add(new DrawnText(x - originX, y - originY, w, h, payload, color, shadow, plainSequence(seq)));
         }
+    }
+
+    private static String plainSequence(FormattedCharSequence seq) {
+        if (seq == null) {
+            return null;
+        }
+        StringBuilder out = new StringBuilder();
+        seq.accept((index, style, codePoint) -> {
+            out.appendCodePoint(codePoint);
+            return true;
+        });
+        return out.isEmpty() ? null : out.toString();
     }
 
     public static void recordEntity(Entity entity) {

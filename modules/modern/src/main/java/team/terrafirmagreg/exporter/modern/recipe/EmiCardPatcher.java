@@ -11,7 +11,6 @@ import java.util.Set;
 import java.util.function.BiFunction;
 import lombok.experimental.UtilityClass;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.FormattedCharSequence;
 import team.terrafirmagreg.exporter.contract.id.EntryKind;
 import team.terrafirmagreg.exporter.contract.text.DumpText;
 import team.terrafirmagreg.exporter.data.recipe.capture.CardWidget;
@@ -129,7 +128,7 @@ class EmiCardPatcher {
                     Math.max(1, text.w()),
                     Math.max(1, text.h()),
                     text.payload(),
-                    EmiTextLines.formattedToString(text.seq()),
+                    text.plain(),
                     text.color(),
                     text.shadow()));
             added = true;
@@ -139,11 +138,11 @@ class EmiCardPatcher {
 
     private static List<CardWidget> mergeInfoTexts(
             List<CardWidget> widgets, List<SceneCapture.DrawnText> drawn, EmiInfoText info) {
-        Map<FormattedCharSequence, Integer> lineParagraph = info.lineParagraph();
+        Map<String, Integer> lineParagraph = info.lineParagraph();
         List<SceneCapture.DrawnText> infoLines = new ArrayList<>();
         List<SceneCapture.DrawnText> free = new ArrayList<>();
         for (SceneCapture.DrawnText text : drawn) {
-            if (text.seq() != null && lineParagraph.containsKey(text.seq())) {
+            if (text.plain() != null && lineParagraph.containsKey(text.plain())) {
                 infoLines.add(text);
             } else {
                 free.add(text);
@@ -203,7 +202,7 @@ class EmiCardPatcher {
                     Math.max(1, text.w()),
                     Math.max(1, text.h()),
                     text.payload(),
-                    EmiTextLines.formattedToString(text.seq()),
+                    text.plain(),
                     text.color(),
                     text.shadow()));
             added = true;

@@ -13,6 +13,7 @@
         "AliLootOptionAccessor",
         "InputConstantsMixin",
         "FallbackResourceManagerMixin",
+        "ForgeEventBusMixin",
         "SceneBlockCaptureMixin",
         "SceneBlockEntityCaptureMixin",
         "SceneItemCaptureMixin",

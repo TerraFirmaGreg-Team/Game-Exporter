@@ -9,6 +9,7 @@ import net.minecraft.resources.ResourceLocation;
 import team.terrafirmagreg.exporter.engine.spec.options.ModIdFilter;
 import team.terrafirmagreg.exporter.engine.spec.options.RecipesComponentConfig;
 import team.terrafirmagreg.exporter.modern.EmiKeys;
+import team.terrafirmagreg.exporter.modern.text.DumpTexts;
 
 record EmiPreparedCard(
         int index,
@@ -34,6 +35,7 @@ record EmiPreparedCard(
         String category = "";
         String id = null;
         try {
+            DumpTexts.clearSources();
             category = categoryId(recipe.getCategory());
             ResourceLocation recipeId = recipe.getId();
             id = recipeId == null ? null : unwrapRecipeId(recipeId.toString());
