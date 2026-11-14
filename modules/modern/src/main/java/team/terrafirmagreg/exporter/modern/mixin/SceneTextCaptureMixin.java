@@ -25,7 +25,7 @@ public abstract class SceneTextCaptureMixin {
         if (text == null || !SceneCapture.suppressed()) {
             return;
         }
-        gameExporter$capture(font, DumpText.text(text), font.width(text), x, y, color, shadow, cir);
+        gameExporter$capture(font, DumpText.text(text), null, font.width(text), x, y, color, shadow, cir);
     }
 
     @Inject(
@@ -43,7 +43,8 @@ public abstract class SceneTextCaptureMixin {
         if (text == null || !SceneCapture.suppressed()) {
             return;
         }
-        gameExporter$capture(font, DumpTexts.sequence(text), font.width(text), x, y, color, shadow, cir);
+        gameExporter$capture(
+                font, DumpTexts.sequenceOrComponent(text), text, font.width(text), x, y, color, shadow, cir);
     }
 
     @Inject(
@@ -55,7 +56,7 @@ public abstract class SceneTextCaptureMixin {
         if (text == null || !SceneCapture.suppressed()) {
             return;
         }
-        gameExporter$capture(font, DumpTexts.ofStyled(text), font.width(text), x, y, color, true, cir);
+        gameExporter$capture(font, DumpTexts.ofStyled(text), null, font.width(text), x, y, color, true, cir);
     }
 
     @Inject(
@@ -67,12 +68,13 @@ public abstract class SceneTextCaptureMixin {
         if (text == null || !SceneCapture.suppressed()) {
             return;
         }
-        gameExporter$capture(font, DumpTexts.ofStyled(text), font.width(text), x, y, color, shadow, cir);
+        gameExporter$capture(font, DumpTexts.ofStyled(text), null, font.width(text), x, y, color, shadow, cir);
     }
 
     private void gameExporter$capture(
             Font font,
             DumpText payload,
+            FormattedCharSequence seq,
             int width,
             int x,
             int y,
@@ -88,6 +90,7 @@ public abstract class SceneTextCaptureMixin {
         float sy = pose.m11();
         SceneCapture.recordText(
                 payload,
+                seq,
                 Math.round(x * sx + pose.m30()),
                 Math.round(y * sy + pose.m31()),
                 Math.max(1, Math.round(width * sx)),

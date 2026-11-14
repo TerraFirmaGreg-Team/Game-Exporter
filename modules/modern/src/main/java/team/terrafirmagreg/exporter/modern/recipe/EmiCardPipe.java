@@ -155,7 +155,10 @@ class EmiCardPipe {
                         EmiCardPatcher.stripSharedFrameBaked(consumed.shots().sceneExtras(), imageSrcs));
             }
             if (consumed.shots() != null && !consumed.shots().cardTexts().isEmpty()) {
-                EmiCardPatcher.texts(consumed.captures(), consumed.shots().cardTexts());
+                EmiCardPatcher.texts(
+                        consumed.captures(),
+                        consumed.shots().cardTexts(),
+                        consumed.shots().cardInfoTexts());
             }
             if (consumed.shots() != null && !consumed.shots().cardItems().isEmpty()) {
                 EmiCardPatcher.items(consumed.captures(), consumed.shots().cardItems());

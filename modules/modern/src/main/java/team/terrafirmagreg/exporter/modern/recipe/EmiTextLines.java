@@ -13,32 +13,50 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.TextColor;
 import net.minecraft.util.FormattedCharSequence;
+import team.terrafirmagreg.exporter.contract.text.DumpText;
 import team.terrafirmagreg.exporter.modern.mixin.ClientTextTooltipAccessor;
+import team.terrafirmagreg.exporter.modern.text.DumpTexts;
 
 @UtilityClass
 class EmiTextLines {
 
-    static List<String> tooltipLines(Widget widget, Bounds bounds) {
+    record TooltipData(List<String> lines, List<DumpText> components) {
+        static final TooltipData EMPTY = new TooltipData(List.of(), List.of());
+    }
+
+    static TooltipData tooltipData(Widget widget, Bounds bounds) {
         List<ClientTooltipComponent> tips;
         try {
             tips = TooltipGuard.call(
                     () -> widget.getTooltip(bounds.x() + bounds.width() / 2, bounds.y() + bounds.height() / 2));
         } catch (Throwable t) {
-            return List.of();
+            return TooltipData.EMPTY;
         }
         if (tips == null || tips.isEmpty()) {
-            return List.of();
+            return TooltipData.EMPTY;
         }
-        List<String> out = new ArrayList<>(tips.size());
+        List<String> lines = new ArrayList<>(tips.size());
+        List<DumpText> components = new ArrayList<>(tips.size());
         for (ClientTooltipComponent component : tips) {
             if (component instanceof ClientTextTooltip text) {
-                String line = formattedToString(((ClientTextTooltipAccessor) text).gameExporter$text());
+                FormattedCharSequence seq = ((ClientTextTooltipAccessor) text).gameExporter$text();
+                String line = formattedToString(seq);
                 if (line != null) {
-                    out.add(line);
+                    lines.add(line);
+                }
+                DumpText node = DumpTexts.sequenceOrComponent(seq);
+                if (node != null) {
+                    components.add(node);
                 }
             }
         }
-        return out.isEmpty() ? List.of() : List.copyOf(out);
+        return new TooltipData(
+                lines.isEmpty() ? List.of() : List.copyOf(lines),
+                components.isEmpty() ? List.of() : List.copyOf(components));
+    }
+
+    static List<String> tooltipLines(Widget widget, Bounds bounds) {
+        return tooltipData(widget, bounds).lines();
     }
 
     static String formattedToString(FormattedCharSequence text) {

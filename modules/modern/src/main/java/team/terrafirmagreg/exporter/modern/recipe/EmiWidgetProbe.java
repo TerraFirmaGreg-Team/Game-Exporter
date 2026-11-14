@@ -187,13 +187,35 @@ class EmiWidgetProbe {
                 continue;
             }
             rawUsed.put(raw, Boolean.TRUE);
-            List<String> lines = EmiTextLines.tooltipLines(widget, new Bounds(raw.x(), raw.y(), raw.w(), raw.h()));
-            if (lines.isEmpty()) {
+            EmiTextLines.TooltipData tip =
+                    EmiTextLines.tooltipData(widget, new Bounds(raw.x(), raw.y(), raw.w(), raw.h()));
+            if (tip.lines().isEmpty() && tip.components().isEmpty()) {
                 continue;
             }
             out.add(new CardWidget(
-                    raw.x(), raw.y(), raw.w(), raw.h(), "widget", null, null, null, null, null, null, null, null, null,
-                    null, null, null, null, lines, null, null, null));
+                    raw.x(),
+                    raw.y(),
+                    raw.w(),
+                    raw.h(),
+                    "widget",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    tip.lines(),
+                    null,
+                    null,
+                    null,
+                    tip.components()));
         }
         return out;
     }

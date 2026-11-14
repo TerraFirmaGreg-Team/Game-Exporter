@@ -172,6 +172,7 @@ final class MemberGrid {
                 widget.tooltip(),
                 widget.component(),
                 widget.color(),
-                widget.shadow());
+                widget.shadow(),
+                widget.tooltipComponents());
     }
 }

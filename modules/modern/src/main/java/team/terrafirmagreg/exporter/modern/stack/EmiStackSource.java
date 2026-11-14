@@ -148,7 +148,7 @@ public final class EmiStackSource implements StackSource {
                 if (!(component instanceof ClientTextTooltipAccessor accessor)) {
                     continue;
                 }
-                DumpText text = DumpTexts.sequence(accessor.gameExporter$text());
+                DumpText text = DumpTexts.sequenceOrComponent(accessor.gameExporter$text());
                 if (text == null) {
                     continue;
                 }

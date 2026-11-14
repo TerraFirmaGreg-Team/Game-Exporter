@@ -1,8 +1,10 @@
 package team.terrafirmagreg.exporter.modern.text;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.WeakHashMap;
 import lombok.experimental.UtilityClass;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
@@ -15,6 +17,9 @@ import team.terrafirmagreg.exporter.contract.text.DumpText;
 
 @UtilityClass
 public class DumpTexts {
+
+    private static final Map<FormattedCharSequence, Component> SOURCES =
+            Collections.synchronizedMap(new WeakHashMap<>());
 
     public static DumpText of(Component component) {
         return of(component, Style.EMPTY, false);
@@ -95,6 +100,24 @@ public class DumpTexts {
         }
         return (node.with() == null || node.with().stream().allMatch(DumpTexts::empty))
                 && (node.extra() == null || node.extra().stream().allMatch(DumpTexts::empty));
+    }
+
+    public static void remember(FormattedCharSequence sequence, Component component) {
+        if (sequence != null && component != null) {
+            SOURCES.put(sequence, component);
+        }
+    }
+
+    public static Component componentOf(FormattedCharSequence sequence) {
+        return sequence == null ? null : SOURCES.get(sequence);
+    }
+
+    public static DumpText sequenceOrComponent(FormattedCharSequence sequence) {
+        if (sequence == null) {
+            return null;
+        }
+        Component source = componentOf(sequence);
+        return source != null ? ofStyled(source) : sequence(sequence);
     }
 
     public static DumpText sequence(FormattedCharSequence sequence) {

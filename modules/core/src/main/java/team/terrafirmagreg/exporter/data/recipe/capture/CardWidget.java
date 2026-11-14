@@ -25,9 +25,11 @@ public record CardWidget(
         List<String> tooltip,
         DumpText component,
         Integer color,
-        Boolean shadow) {
+        Boolean shadow,
+        List<DumpText> tooltipComponents) {
     public CardWidget {
         tooltip = tooltip == null ? List.of() : List.copyOf(tooltip);
+        tooltipComponents = tooltipComponents == null ? List.of() : List.copyOf(tooltipComponents);
     }
 
     public CardWidget(int x, int y, int w, int h, String role, Interaction interaction) {
@@ -53,13 +55,42 @@ public record CardWidget(
                 null,
                 null,
                 null,
+                null,
                 null);
     }
 
-    public static CardWidget textAt(int x, int y, int w, int h, DumpText component, int color, boolean shadow) {
-        String plain = component != null && component.translate() == null ? component.text() : null;
+    public static CardWidget textAt(
+            int x, int y, int w, int h, DumpText component, String plain, int color, boolean shadow) {
         return new CardWidget(
                 x, y, w, h, "text", null, plain, null, null, null, null, null, null, null, null, null, null, null, null,
-                component, color, shadow);
+                component, color, shadow, null);
+    }
+
+    public static CardWidget paragraph(
+            int x, int y, int w, int h, DumpText component, String plain, int color, boolean shadow) {
+        return new CardWidget(
+                x,
+                y,
+                w,
+                h,
+                "paragraph",
+                null,
+                plain,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                component,
+                color,
+                shadow,
+                null);
     }
 }

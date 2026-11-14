@@ -7,13 +7,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import lombok.experimental.UtilityClass;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.FormattedCharSequence;
 import team.terrafirmagreg.exporter.contract.text.DumpText;
 import team.terrafirmagreg.exporter.data.recipe.capture.CardWidget;
 import team.terrafirmagreg.exporter.data.recipe.capture.Interaction;
 import team.terrafirmagreg.exporter.modern.mixin.EmiAnimatedTextureAccessor;
 import team.terrafirmagreg.exporter.modern.mixin.EmiTextWidgetAccessor;
 import team.terrafirmagreg.exporter.modern.mixin.EmiTextureWidgetAccessor;
+import team.terrafirmagreg.exporter.modern.text.DumpTexts;
 
 @UtilityClass
 class EmiWidgetCapture {
@@ -69,7 +72,9 @@ class EmiWidgetCapture {
                     interaction);
         }
         CapturingWidgetHolder.Extra extra = extras.get(widget);
-        List<String> tooltip = EmiTextLines.tooltipLines(widget, bounds);
+        EmiTextLines.TooltipData tooltipData = EmiTextLines.tooltipData(widget, bounds);
+        List<String> tooltip = tooltipData.lines();
+        List<DumpText> tooltipComponents = tooltipData.components();
         if (widget instanceof TextureWidget texture) {
             EmiTextureWidgetAccessor access = (EmiTextureWidgetAccessor) texture;
             ResourceLocation id = access.gameExporter$texture();
@@ -109,11 +114,19 @@ class EmiWidgetCapture {
                     tooltip,
                     null,
                     null,
-                    null);
+                    null,
+                    tooltipComponents);
         }
         if (widget instanceof TextWidget text) {
-            String value = EmiTextLines.formattedToString(((EmiTextWidgetAccessor) text).gameExporter$text());
+            FormattedCharSequence seq = ((EmiTextWidgetAccessor) text).gameExporter$text();
+            String value = EmiTextLines.formattedToString(seq);
             DumpText component = extra == null ? null : extra.component();
+            if (component == null) {
+                Component source = DumpTexts.componentOf(seq);
+                if (source != null) {
+                    component = DumpTexts.ofStyled(source);
+                }
+            }
             Integer color = extra == null ? null : extra.color();
             if (value == null && tooltip.isEmpty() && component == null) {
                 return null;
@@ -140,7 +153,8 @@ class EmiWidgetCapture {
                     tooltip,
                     component,
                     color,
-                    ((EmiTextWidgetAccessor) text).gameExporter$shadow());
+                    ((EmiTextWidgetAccessor) text).gameExporter$shadow(),
+                    tooltipComponents);
         }
         return null;
     }

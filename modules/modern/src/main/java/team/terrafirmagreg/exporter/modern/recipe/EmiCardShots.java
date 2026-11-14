@@ -49,6 +49,7 @@ final class EmiCardShots implements AutoCloseable {
     private final Map<String, SceneCapture.Result> scenes = new LinkedHashMap<>();
     private final Map<String, String> sceneCategories = new HashMap<>();
     private final Map<String, List<SceneCapture.DrawnText>> cardTexts = new LinkedHashMap<>();
+    private final Map<String, EmiInfoText> infoTexts = new LinkedHashMap<>();
     private final Map<String, List<SceneCapture.DrawnItem>> cardItems = new LinkedHashMap<>();
     private final Map<String, Map<String, Object>> multiblocks = new LinkedHashMap<>();
     private final Map<String, Map<String, Object>> sceneExtras = new LinkedHashMap<>();
@@ -156,6 +157,10 @@ final class EmiCardShots implements AutoCloseable {
         return cardTexts;
     }
 
+    Map<String, EmiInfoText> cardInfoTexts() {
+        return infoTexts;
+    }
+
     Map<String, List<SceneCapture.DrawnItem>> cardItems() {
         return cardItems;
     }
@@ -195,6 +200,12 @@ final class EmiCardShots implements AutoCloseable {
         try {
             long t = System.nanoTime();
             EmiRecipe recipe = prepared.recipe();
+            if (recipe instanceof EmiInfoTextAccess access) {
+                EmiInfoText infoText = access.gameExporter$infoText();
+                if (infoText != null) {
+                    infoTexts.put(recipeId, infoText);
+                }
+            }
             int displayW = prepared.displayW();
             int displayH = prepared.displayH();
             Integer viewH = grid != null ? grid.templateDisplayHeight() : null;

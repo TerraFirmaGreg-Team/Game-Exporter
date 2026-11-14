@@ -82,7 +82,8 @@ final class CapturingWidgetHolder implements WidgetHolder {
         TextWidget widget = WidgetHolder.super.addText(text, x, y, color, shadow);
         String s = EmiTextLines.formattedToString(text);
         if (s != null) {
-            extras.put(widget, Extra.text(s));
+            Component source = DumpTexts.componentOf(text);
+            extras.put(widget, source != null ? Extra.component(s, DumpTexts.ofStyled(source), color) : Extra.text(s));
         }
         return widget;
     }

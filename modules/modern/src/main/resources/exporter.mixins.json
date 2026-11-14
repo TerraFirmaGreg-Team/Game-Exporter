@@ -29,6 +29,8 @@
         "EmiListIngredientMixin",
         "EmiGeneratedSlotMixin",
         "ClientTextTooltipAccessor",
+        "ClientLanguageMixin",
+        "EmiInfoRecipeMixin",
         "UtilFreezeMixin",
         "LevelFreezeMixin",
         "AliLootHeightMixin"

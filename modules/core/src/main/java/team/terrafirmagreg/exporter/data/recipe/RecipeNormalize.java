@@ -53,36 +53,60 @@ public class RecipeNormalize {
                 continue;
             }
             String role = captureRole(widget);
-            if (!"text".equals(role)) {
-                if (("texture".equals(role) || "animated".equals(role))
-                        && widget.texture() != null
-                        && !widget.texture().isBlank()) {
-                    out.add(new RecipeWidget(
-                            role,
-                            widget.x(),
-                            widget.y(),
-                            widget.w(),
-                            widget.h(),
-                            null,
-                            widget.texture(),
-                            widget.u(),
-                            widget.v(),
-                            widget.regionW(),
-                            widget.regionH(),
-                            widget.time(),
-                            widget.horizontal(),
-                            widget.endToStart(),
-                            widget.fullToEmpty(),
-                            widget.textureW(),
-                            widget.textureH(),
-                            widget.tooltip(),
-                            widget.component(),
-                            widget.color(),
-                            widget.shadow()));
-                }
-                if (widget.tooltip().isEmpty()) {
-                    continue;
-                }
+            if ("text".equals(role) || "paragraph".equals(role)) {
+                out.add(new RecipeWidget(
+                        role,
+                        widget.x(),
+                        widget.y(),
+                        widget.w(),
+                        widget.h(),
+                        widget.text(),
+                        widget.texture(),
+                        widget.u(),
+                        widget.v(),
+                        widget.regionW(),
+                        widget.regionH(),
+                        widget.time(),
+                        widget.horizontal(),
+                        widget.endToStart(),
+                        widget.fullToEmpty(),
+                        widget.textureW(),
+                        widget.textureH(),
+                        widget.tooltip(),
+                        widget.component(),
+                        widget.color(),
+                        widget.shadow(),
+                        widget.tooltipComponents()));
+                continue;
+            }
+            if (("texture".equals(role) || "animated".equals(role))
+                    && widget.texture() != null
+                    && !widget.texture().isBlank()) {
+                out.add(new RecipeWidget(
+                        role,
+                        widget.x(),
+                        widget.y(),
+                        widget.w(),
+                        widget.h(),
+                        null,
+                        widget.texture(),
+                        widget.u(),
+                        widget.v(),
+                        widget.regionW(),
+                        widget.regionH(),
+                        widget.time(),
+                        widget.horizontal(),
+                        widget.endToStart(),
+                        widget.fullToEmpty(),
+                        widget.textureW(),
+                        widget.textureH(),
+                        widget.tooltip(),
+                        widget.component(),
+                        widget.color(),
+                        widget.shadow(),
+                        widget.tooltipComponents()));
+            }
+            if (!widget.tooltip().isEmpty() || !widget.tooltipComponents().isEmpty()) {
                 out.add(new RecipeWidget(
                         "widget",
                         widget.x(),
@@ -104,31 +128,9 @@ public class RecipeNormalize {
                         widget.tooltip(),
                         null,
                         null,
-                        null));
-                continue;
+                        null,
+                        widget.tooltipComponents()));
             }
-            out.add(new RecipeWidget(
-                    "text",
-                    widget.x(),
-                    widget.y(),
-                    widget.w(),
-                    widget.h(),
-                    widget.text(),
-                    widget.texture(),
-                    widget.u(),
-                    widget.v(),
-                    widget.regionW(),
-                    widget.regionH(),
-                    widget.time(),
-                    widget.horizontal(),
-                    widget.endToStart(),
-                    widget.fullToEmpty(),
-                    widget.textureW(),
-                    widget.textureH(),
-                    widget.tooltip(),
-                    widget.component(),
-                    widget.color(),
-                    widget.shadow()));
         }
         return List.copyOf(out);
     }

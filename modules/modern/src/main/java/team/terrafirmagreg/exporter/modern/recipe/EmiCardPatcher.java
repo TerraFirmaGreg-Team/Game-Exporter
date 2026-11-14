@@ -1,6 +1,7 @@
 package team.terrafirmagreg.exporter.modern.recipe;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -9,7 +10,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.BiFunction;
 import lombok.experimental.UtilityClass;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 import team.terrafirmagreg.exporter.contract.id.EntryKind;
+import team.terrafirmagreg.exporter.contract.text.DumpText;
 import team.terrafirmagreg.exporter.data.recipe.capture.CardWidget;
 import team.terrafirmagreg.exporter.data.recipe.capture.Interaction;
 import team.terrafirmagreg.exporter.data.recipe.capture.RecipeLayoutPass;
@@ -46,8 +50,27 @@ class EmiCardPatcher {
         patchProperty(captures, scenes, "scene");
     }
 
-    static void texts(List<RecipeLayoutPass.Capture> captures, Map<String, List<SceneCapture.DrawnText>> texts) {
-        patchWidgets(captures, texts, EmiCardPatcher::mergeTexts);
+    static void texts(
+            List<RecipeLayoutPass.Capture> captures,
+            Map<String, List<SceneCapture.DrawnText>> texts,
+            Map<String, EmiInfoText> infoTexts) {
+        for (int i = 0; i < captures.size(); i++) {
+            RecipeLayoutPass.Capture capture = captures.get(i);
+            if (capture == null) {
+                continue;
+            }
+            List<SceneCapture.DrawnText> drawn = texts.get(capture.imageId());
+            if (drawn == null || drawn.isEmpty()) {
+                continue;
+            }
+            EmiInfoText infoText = infoTexts == null ? null : infoTexts.get(capture.imageId());
+            List<CardWidget> merged = infoText != null
+                    ? mergeInfoTexts(capture.widgets(), drawn, infoText)
+                    : mergeTexts(capture.widgets(), drawn);
+            if (merged != null) {
+                captures.set(i, capture.withWidgets(merged));
+            }
+        }
     }
 
     static void items(List<RecipeLayoutPass.Capture> captures, Map<String, List<SceneCapture.DrawnItem>> items) {
@@ -101,7 +124,88 @@ class EmiCardPatcher {
                 continue;
             }
             merged.add(CardWidget.textAt(
-                    x, y, Math.max(1, text.w()), Math.max(1, text.h()), text.payload(), text.color(), text.shadow()));
+                    x,
+                    y,
+                    Math.max(1, text.w()),
+                    Math.max(1, text.h()),
+                    text.payload(),
+                    EmiTextLines.formattedToString(text.seq()),
+                    text.color(),
+                    text.shadow()));
+            added = true;
+        }
+        return added ? merged : null;
+    }
+
+    private static List<CardWidget> mergeInfoTexts(
+            List<CardWidget> widgets, List<SceneCapture.DrawnText> drawn, EmiInfoText info) {
+        Map<FormattedCharSequence, Integer> lineParagraph = info.lineParagraph();
+        List<SceneCapture.DrawnText> infoLines = new ArrayList<>();
+        List<SceneCapture.DrawnText> free = new ArrayList<>();
+        for (SceneCapture.DrawnText text : drawn) {
+            if (text.seq() != null && lineParagraph.containsKey(text.seq())) {
+                infoLines.add(text);
+            } else {
+                free.add(text);
+            }
+        }
+        if (infoLines.isEmpty()) {
+            return mergeTexts(widgets, drawn);
+        }
+        List<DumpText> parts = new ArrayList<>();
+        StringBuilder plain = new StringBuilder();
+        boolean firstPart = true;
+        for (Component paragraph : info.paragraphs()) {
+            if (paragraph == null) {
+                continue;
+            }
+            if (!firstPart) {
+                parts.add(DumpText.text("\n"));
+                plain.append('\n');
+            }
+            firstPart = false;
+            DumpText node = DumpTexts.ofStyled(paragraph);
+            if (node != null) {
+                parts.add(node);
+            }
+            plain.append(paragraph.getString());
+        }
+        DumpText payload = parts.isEmpty() ? null : new DumpText(null, null, null, null, List.copyOf(parts));
+        infoLines.sort(Comparator.comparingInt(SceneCapture.DrawnText::y));
+        List<CardWidget> merged = new ArrayList<>(widgets);
+        boolean added = false;
+        if (payload != null && !SceneCapture.progressText(payload)) {
+            SceneCapture.DrawnText top = infoLines.getFirst();
+            SceneCapture.DrawnText bottom = infoLines.getLast();
+            merged.add(CardWidget.paragraph(
+                    top.x() - EmiRecipeGui.MARGIN,
+                    top.y() - EmiRecipeGui.MARGIN,
+                    info.wrapWidth(),
+                    bottom.y() - top.y() + Math.max(1, top.h()),
+                    payload,
+                    plain.toString(),
+                    top.color(),
+                    top.shadow()));
+            added = true;
+        }
+        for (SceneCapture.DrawnText text : free) {
+            if (DumpTexts.empty(text.payload()) || SceneCapture.progressText(text.payload())) {
+                continue;
+            }
+            int x = text.x() - EmiRecipeGui.MARGIN;
+            int y = text.y() - EmiRecipeGui.MARGIN;
+            if (hasTextAt(merged, x, y)) {
+                continue;
+            }
+            merged.add(CardWidget.textAt(
+                    x,
+                    y,
+                    Math.max(1, text.w()),
+                    Math.max(1, text.h()),
+                    text.payload(),
+                    EmiTextLines.formattedToString(text.seq()),
+                    text.color(),
+                    text.shadow()));
             added = true;
         }
         return added ? merged : null;

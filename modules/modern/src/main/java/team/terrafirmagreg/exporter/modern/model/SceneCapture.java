@@ -19,6 +19,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.Item;
@@ -91,7 +92,8 @@ public class SceneCapture {
 
     public record DrawnEntity(String id, int x, int y, int w, int h, Rect clip, boolean rendered) {}
 
-    public record DrawnText(int x, int y, int w, int h, DumpText payload, int color, boolean shadow) {}
+    public record DrawnText(
+            int x, int y, int w, int h, DumpText payload, int color, boolean shadow, FormattedCharSequence seq) {}
 
     private record DrawnKey(int x, int y, Item item, CompoundTag tag) {}
 
@@ -243,7 +245,8 @@ public class SceneCapture {
                 && PROGRESS_TEXT.matcher(DumpTexts.plain(payload)).find();
     }
 
-    public static void recordText(DumpText payload, int x, int y, int w, int h, int color, boolean shadow) {
+    public static void recordText(
+            DumpText payload, FormattedCharSequence seq, int x, int y, int w, int h, int color, boolean shadow) {
         if (payload == null) {
             return;
         }
@@ -251,7 +254,7 @@ public class SceneCapture {
             if (texts == null || !suppressed || widgetTextCovered) {
                 return;
             }
-            texts.add(new DrawnText(x - originX, y - originY, w, h, payload, color, shadow));
+            texts.add(new DrawnText(x - originX, y - originY, w, h, payload, color, shadow, seq));
         }
     }
 

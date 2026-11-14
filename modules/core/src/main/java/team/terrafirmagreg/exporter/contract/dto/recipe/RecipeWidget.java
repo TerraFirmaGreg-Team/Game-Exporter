@@ -29,11 +29,15 @@ public record RecipeWidget(
 
         @JsonInclude(JsonInclude.Include.NON_NULL) @Nullable DumpText component,
         @JsonInclude(JsonInclude.Include.NON_NULL) @Nullable Integer color,
-        @JsonInclude(JsonInclude.Include.NON_NULL) @Nullable Boolean shadow) {
+        @JsonInclude(JsonInclude.Include.NON_NULL) @Nullable Boolean shadow,
+
+        @JsonInclude(JsonInclude.Include.NON_EMPTY) @Nullable
+        List<DumpText> tooltipComponents) {
     public RecipeWidget {
         if (type == null || type.isBlank()) {
             type = "widget";
         }
         tooltip = tooltip == null ? List.of() : List.copyOf(tooltip);
+        tooltipComponents = tooltipComponents == null ? List.of() : List.copyOf(tooltipComponents);
     }
 }
