@@ -213,7 +213,7 @@ final class StreamingCardSink implements RecipeCardSink {
     private Prepared prepare(String id, ResourceId parsed, String category, RecipeCardImage card) {
         try {
             RecipeCardImage processed = card.prep() == null ? card : card.prep().apply(card);
-            int[] argb = ArgbImage.whitenFaint(processed.argb());
+            int[] argb = processed.argb();
             int width = processed.width();
             int height = processed.height();
             String contentKey = category == null ? null : category + '|' + contentHash(argb, width, height);

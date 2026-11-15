@@ -59,6 +59,33 @@ public record CardWidget(
                 null);
     }
 
+    public static CardWidget tip(int x, int y, int w, int h, List<String> tooltip, List<DumpText> components) {
+        return new CardWidget(
+                x,
+                y,
+                w,
+                h,
+                "widget",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                tooltip,
+                null,
+                null,
+                null,
+                components);
+    }
+
     public static CardWidget textAt(
             int x, int y, int w, int h, DumpText component, String plain, int color, boolean shadow) {
         return new CardWidget(

@@ -28,7 +28,7 @@ class EmiWidgetProbe {
 
     private record ProbeRegion(int x, int y, int w, int h) {}
 
-    private record Sig(Class<?> cls, int w, int h) {}
+    record Sig(Class<?> cls, int w, int h) {}
 
     record Candidate(EmiIngredient stack, String role, List<Sig> sig) {}
 
@@ -280,7 +280,7 @@ class EmiWidgetProbe {
         return false;
     }
 
-    private static List<Sig> signature(List<ClientTooltipComponent> components) {
+    static List<Sig> signature(List<ClientTooltipComponent> components) {
         if (components == null || components.isEmpty()) {
             return List.of();
         }

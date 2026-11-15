@@ -30,6 +30,7 @@ import net.minecraftforge.registries.ForgeRegistries;
 import org.joml.Matrix4f;
 import org.joml.Vector4f;
 import team.terrafirmagreg.exporter.contract.text.DumpText;
+import team.terrafirmagreg.exporter.data.recipe.capture.CardWidget;
 import team.terrafirmagreg.exporter.modern.text.DumpTexts;
 import team.terrafirmagreg.exporter.modern.texture.CaptureScissor;
 import team.terrafirmagreg.exporter.util.ExportLog;
@@ -73,6 +74,7 @@ public class SceneCapture {
             List<DrawnItem> items,
             List<DrawnEntity> entities,
             List<DrawnText> texts,
+            List<CardWidget> tips,
             Rect bounds,
             BlockAndTintGetter level) {
         public boolean isEmpty() {
@@ -104,6 +106,7 @@ public class SceneCapture {
     private static List<DrawnEntity> entities;
     private static List<Entity> entityObjects;
     private static List<DrawnText> texts;
+    private static List<CardWidget> tips;
     private static Rect bounds;
     private static int widgetX;
     private static int widgetY;
@@ -130,6 +133,7 @@ public class SceneCapture {
             entities = new ArrayList<>();
             entityObjects = new ArrayList<>();
             texts = new ArrayList<>();
+            tips = new ArrayList<>();
             bounds = null;
             widgetActive = false;
             widgetTextCovered = false;
@@ -524,8 +528,17 @@ public class SceneCapture {
                 items,
                 entities.isEmpty() ? List.of() : List.copyOf(entities.values()),
                 texts.isEmpty() ? List.of() : List.copyOf(texts.values()),
+                next.tips().isEmpty() ? prev.tips() : next.tips(),
                 Rect.union(prev.bounds(), next.bounds()),
                 prev.level() != null ? prev.level() : next.level());
+    }
+
+    public static void recordTip(CardWidget tip) {
+        synchronized (LOCK) {
+            if (tips != null) {
+                tips.add(tip);
+            }
+        }
     }
 
     public static Result end() {
@@ -586,6 +599,8 @@ public class SceneCapture {
                     uniqueEntities.merge(entity.id(), entity, SceneCapture::mergeEntity);
                 }
             }
+            List<CardWidget> drawnTips = tips;
+            tips = null;
             Map<DrawnTextKey, List<DrawnText>> textGroups = new LinkedHashMap<>();
             List<DrawnText> uniqueTexts = new ArrayList<>();
             if (drawnTexts != null) {
@@ -609,6 +624,7 @@ public class SceneCapture {
                     unique.isEmpty() ? List.of() : List.copyOf(unique.values()),
                     uniqueEntities.isEmpty() ? List.of() : List.copyOf(uniqueEntities.values()),
                     uniqueTexts.isEmpty() ? List.of() : List.copyOf(uniqueTexts),
+                    drawnTips == null || drawnTips.isEmpty() ? List.of() : List.copyOf(drawnTips),
                     region,
                     sceneLevel);
         }

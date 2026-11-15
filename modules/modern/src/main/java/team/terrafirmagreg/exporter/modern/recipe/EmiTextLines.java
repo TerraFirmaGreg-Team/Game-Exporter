@@ -32,6 +32,10 @@ class EmiTextLines {
         } catch (Throwable t) {
             return TooltipData.EMPTY;
         }
+        return tooltipData(tips);
+    }
+
+    static TooltipData tooltipData(List<ClientTooltipComponent> tips) {
         if (tips == null || tips.isEmpty()) {
             return TooltipData.EMPTY;
         }

@@ -21,6 +21,7 @@ import net.minecraft.client.Minecraft;
 import team.terrafirmagreg.exporter.assets.atlas.ArgbImage;
 import team.terrafirmagreg.exporter.assets.atlas.CaptureMetrics;
 import team.terrafirmagreg.exporter.data.recipe.capture.CardShot;
+import team.terrafirmagreg.exporter.data.recipe.capture.CardWidget;
 import team.terrafirmagreg.exporter.data.recipe.capture.RecipeCardImage;
 import team.terrafirmagreg.exporter.data.recipe.capture.RecipeCardSink;
 import team.terrafirmagreg.exporter.dump.DumpLayout;
@@ -51,6 +52,7 @@ final class EmiCardShots implements AutoCloseable {
     private final Map<String, List<SceneCapture.DrawnText>> cardTexts = new LinkedHashMap<>();
     private final Map<String, EmiInfoText> infoTexts = new LinkedHashMap<>();
     private final Map<String, List<SceneCapture.DrawnItem>> cardItems = new LinkedHashMap<>();
+    private final Map<String, List<CardWidget>> cardTips = new LinkedHashMap<>();
     private final Map<String, Map<String, Object>> multiblocks = new LinkedHashMap<>();
     private final Map<String, Map<String, Object>> sceneExtras = new LinkedHashMap<>();
     private final Map<String, String> categoryIcons = new LinkedHashMap<>();
@@ -94,6 +96,7 @@ final class EmiCardShots implements AutoCloseable {
     private record SceneOutcome(
             List<SceneCapture.DrawnText> texts,
             List<SceneCapture.DrawnItem> items,
+            List<CardWidget> tips,
             Map<String, Object> extra,
             SceneCapture.Result glbScene,
             long filterNs) {}
@@ -155,6 +158,10 @@ final class EmiCardShots implements AutoCloseable {
 
     Map<String, List<SceneCapture.DrawnText>> cardTexts() {
         return cardTexts;
+    }
+
+    Map<String, List<CardWidget>> cardTips() {
+        return cardTips;
     }
 
     Map<String, EmiInfoText> cardInfoTexts() {
@@ -342,32 +349,43 @@ final class EmiCardShots implements AutoCloseable {
         List<SceneCapture.DrawnText> texts =
                 scene.texts().isEmpty() ? List.of() : CardSceneFilter.dedupeTexts(scene.texts());
         List<SceneCapture.DrawnItem> items = CardSceneFilter.outsideSlots(scene.items(), dumpWidgets);
+        List<CardWidget> tips = scene.tips();
         if (!scene.isEmpty()) {
             List<SceneCapture.DrawnEntity> entities =
                     CardSceneFilter.entitiesOutsideSlots(scene.entities(), dumpWidgets);
             if (!options.glbAllowed(category)) {
-                Map<String, Object> extra = SceneExtras.extra(
-                        new SceneCapture.Result(Map.of(), List.of(), entities, List.of(), scene.bounds(), null));
+                Map<String, Object> extra = SceneExtras.extra(new SceneCapture.Result(
+                        Map.of(), List.of(), entities, List.of(), List.of(), scene.bounds(), null));
                 return new SceneOutcome(
-                        texts, items, extra.isEmpty() ? null : extra, null, System.nanoTime() - startNs);
+                        texts, items, tips, extra.isEmpty() ? null : extra, null, System.nanoTime() - startNs);
             }
             if (!scene.blocks().isEmpty() || !items.isEmpty() || !entities.isEmpty()) {
                 return new SceneOutcome(
                         texts,
                         items,
+                        tips,
                         null,
                         new SceneCapture.Result(
-                                scene.blocks(), items, entities, scene.texts(), scene.bounds(), scene.level()),
+                                scene.blocks(),
+                                items,
+                                entities,
+                                scene.texts(),
+                                scene.tips(),
+                                scene.bounds(),
+                                scene.level()),
                         System.nanoTime() - startNs);
             }
         }
-        return new SceneOutcome(texts, items, null, null, System.nanoTime() - startNs);
+        return new SceneOutcome(texts, items, tips, null, null, System.nanoTime() - startNs);
     }
 
     private void applySceneJob(SceneJob job, SceneOutcome outcome) {
         stats.sceneNs += outcome.filterNs();
         if (!outcome.texts().isEmpty()) {
             cardTexts.put(job.id(), outcome.texts());
+        }
+        if (!outcome.tips().isEmpty()) {
+            cardTips.put(job.id(), outcome.tips());
         }
         if (!outcome.items().isEmpty()) {
             cardItems.put(job.id(), outcome.items());

@@ -6,21 +6,6 @@ import lombok.experimental.UtilityClass;
 
 @UtilityClass
 public class ArgbImage {
-    public static final int FAINT_ALPHA_MAX = 64;
-
-    public static int[] whitenFaint(int[] argb) {
-        if (argb == null) {
-            return null;
-        }
-        int[] out = argb.clone();
-        for (int i = 0; i < out.length; i++) {
-            int alpha = out[i] >>> 24;
-            if (alpha != 0 && alpha < FAINT_ALPHA_MAX) {
-                out[i] = (alpha << 24) | 0xFFFFFF;
-            }
-        }
-        return out;
-    }
 
     public static BufferedImage fromArgb(int[] argb, int width, int height) {
         if (argb == null || argb.length < width * height) {

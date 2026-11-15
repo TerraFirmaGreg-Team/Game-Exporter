@@ -76,6 +76,12 @@ class EmiCardPatcher {
         patchWidgets(captures, items, EmiCardPatcher::mergeItems);
     }
 
+    static void tips(
+            List<RecipeLayoutPass.Capture> captures,
+            Map<String, List<CardWidget>> tips) {
+        patchWidgets(captures, tips, EmiCardPatcher::mergeTips);
+    }
+
     private static void patchProperty(
             List<RecipeLayoutPass.Capture> captures, Map<String, Map<String, Object>> byImageId, String key) {
         for (int i = 0; i < captures.size(); i++) {
@@ -241,6 +247,21 @@ class EmiCardPatcher {
                     "renderOnly",
                     new Interaction(EntryKind.ITEM, stackId, count > 1 ? count : null)));
             added = true;
+        }
+        return added ? merged : null;
+    }
+
+    private static List<CardWidget> mergeTips(List<CardWidget> widgets, List<CardWidget> tips) {
+        List<CardWidget> merged = new ArrayList<>(widgets);
+        boolean added = false;
+        for (CardWidget tip : tips) {
+            boolean dup = merged.stream()
+                    .anyMatch(w ->
+                            w.x() == tip.x() && w.y() == tip.y() && w.w() == tip.w() && w.h() == tip.h());
+            if (!dup) {
+                merged.add(tip);
+                added = true;
+            }
         }
         return added ? merged : null;
     }

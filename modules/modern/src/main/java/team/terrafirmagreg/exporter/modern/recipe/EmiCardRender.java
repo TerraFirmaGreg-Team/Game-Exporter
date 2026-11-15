@@ -55,12 +55,16 @@ class EmiCardRender {
         return widgets;
     }
 
+    static boolean isExternalWidget(Widget widget) {
+        return widget != null && !widget.getClass().getName().startsWith("dev.emi.emi.");
+    }
+
     static boolean containsExternalWidget(List<Widget> widgets) {
         if (widgets == null) {
             return false;
         }
         for (Widget widget : widgets) {
-            if (!widget.getClass().getName().startsWith("dev.emi.emi.")) {
+            if (isExternalWidget(widget)) {
                 return true;
             }
         }
@@ -259,7 +263,15 @@ class EmiCardRender {
         }
         context.push();
         context.matrices().translate(guiX + EmiRecipeGui.MARGIN, guiY + EmiRecipeGui.MARGIN, 0);
-        renderWidgets(recipe, viewH != null ? MemberGrid.templateWidgets(widgets) : widgets, context, displayW);
+        List<Widget> drawn = viewH != null ? MemberGrid.templateWidgets(widgets) : widgets;
+        renderWidgets(recipe, drawn, context, displayW);
+        try {
+            EmiModularTips.sweep(drawn, context.raw(), displayW, displayH);
+        } catch (VirtualMachineError e) {
+            throw e;
+        } catch (Throwable t) {
+            WIDGET_WARN.warn("modular tooltip sweep failed: {}", t.toString());
+        }
         context.pop();
     }
 

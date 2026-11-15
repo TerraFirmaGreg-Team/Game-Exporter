@@ -163,6 +163,9 @@ class EmiCardPipe {
             if (consumed.shots() != null && !consumed.shots().cardItems().isEmpty()) {
                 EmiCardPatcher.items(consumed.captures(), consumed.shots().cardItems());
             }
+            if (consumed.shots() != null && !consumed.shots().cardTips().isEmpty()) {
+                EmiCardPatcher.tips(consumed.captures(), consumed.shots().cardTips());
+            }
             summary(consumed);
             RecipeLayoutPass.Result pass = RecipeLayoutPass.run(consumed.captures(), imageSrcs);
             List<String> diagnostics = new ArrayList<>(consumed.diagnostics());

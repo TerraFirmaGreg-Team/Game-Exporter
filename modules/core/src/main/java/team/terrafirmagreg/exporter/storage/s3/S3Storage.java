@@ -30,6 +30,9 @@ public final class S3Storage implements StorageTarget {
 
     private static String env(String name) {
         String value = System.getenv(name);
+        if (value == null || value.isBlank()) {
+            value = System.getProperty(name);
+        }
         return value == null ? "" : value.trim();
     }
 

@@ -21,12 +21,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.client.Minecraft;
+import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.registries.ForgeRegistries;
 import team.terrafirmagreg.exporter.contract.ref.ReferenceKind;
 import team.terrafirmagreg.exporter.contract.ref.TaggedReference;
+import team.terrafirmagreg.exporter.contract.text.DumpText;
 import team.terrafirmagreg.exporter.modern.mixin.AciScrollWidgetAccessor;
 import team.terrafirmagreg.exporter.modern.mixin.AliBlockSlotAccessor;
 import team.terrafirmagreg.exporter.modern.mixin.AliEntityLootAccessor;
@@ -34,6 +36,7 @@ import team.terrafirmagreg.exporter.modern.mixin.AliLootOptionAccessor;
 import team.terrafirmagreg.exporter.modern.mixin.AliLootSlotAccessor;
 import team.terrafirmagreg.exporter.modern.mixin.AliScrollWidgetAccessor;
 import team.terrafirmagreg.exporter.modern.mixin.EmiTextWidgetAccessor;
+import team.terrafirmagreg.exporter.modern.text.DumpTexts;
 
 final class AliScrollCompat {
     private AliScrollCompat() {}
@@ -202,22 +205,29 @@ final class AliScrollCompat {
                         int index =
                                 options.size() == 1 ? 0 : (int) (System.currentTimeMillis() / 1000 % options.size());
                         if (options.get(index) instanceof AliLootOptionAccessor option) {
-                            List<String> tooltip = lootTooltip(option.gameExporter$entry());
-                            if (!tooltip.isEmpty()) {
-                                el.put("tooltip", tooltip);
+                            Tips tooltip = lootTooltip(option.gameExporter$entry());
+                            if (!tooltip.lines().isEmpty()) {
+                                el.put("tooltip", tooltip.lines());
+                            }
+                            if (!tooltip.components().isEmpty()) {
+                                el.put("tooltipComponents", tooltip.components());
                             }
                         }
                     }
                 }
             } else if (child instanceof TextWidget) {
                 EmiTextWidgetAccessor accessor = (EmiTextWidgetAccessor) child;
-                String text = EmiTextLines.formattedToString(accessor.gameExporter$text())
-                        .trim();
+                FormattedCharSequence seq = accessor.gameExporter$text();
+                String text = EmiTextLines.formattedToString(seq).trim();
                 if (text.isEmpty()) {
                     continue;
                 }
                 el.put("kind", "text");
                 el.put("text", text);
+                DumpText component = DumpTexts.sequenceOrComponent(seq);
+                if (component != null) {
+                    el.put("component", component);
+                }
                 el.put("color", accessor.gameExporter$color());
                 if (firstSlotTop != Integer.MAX_VALUE && b.y() + b.height() <= firstSlotTop) {
                     el.put("pin", true);
@@ -251,24 +261,29 @@ final class AliScrollCompat {
         el.put("kind", "entity");
         el.put("pin", true);
         el.put("ref", new TaggedReference(ReferenceKind.ENTITY, entityId.toString()));
-        List<String> tooltip = spawnTooltip(loot.gameExporter$lootTable());
-        if (!tooltip.isEmpty()) {
-            el.put("tooltip", tooltip);
+        Tips tooltip = spawnTooltip(loot.gameExporter$lootTable());
+        if (!tooltip.lines().isEmpty()) {
+            el.put("tooltip", tooltip.lines());
+        }
+        if (!tooltip.components().isEmpty()) {
+            el.put("tooltipComponents", tooltip.components());
         }
         return el;
     }
 
-    private static List<String> spawnTooltip(IDataNode lootTable) {
+    private record Tips(List<String> lines, List<DumpText> components) {}
+
+    private static Tips spawnTooltip(IDataNode lootTable) {
         List<TooltipLine> lines;
         try {
             lines = TooltipGuard.call(() -> GenericUtils.getSpawnTooltip(lootTable));
         } catch (Throwable t) {
-            return List.of();
+            return new Tips(List.of(), List.of());
         }
-        return linesToStrings(lines);
+        return toTips(lines);
     }
 
-    private static List<String> lootTooltip(IDataNode entry) {
+    private static Tips lootTooltip(IDataNode entry) {
         List<TooltipLine> lines;
         try {
             lines = TooltipGuard.call(() -> CoreTooltipUtils.toLines(
@@ -278,24 +293,29 @@ final class AliScrollCompat {
                     TooltipUtils.getStyle(),
                     TooltipUtils.getNumberOptions()));
         } catch (Throwable t) {
-            return List.of();
+            return new Tips(List.of(), List.of());
         }
-        return linesToStrings(lines);
+        return toTips(lines);
     }
 
-    private static List<String> linesToStrings(List<TooltipLine> lines) {
+    private static Tips toTips(List<TooltipLine> lines) {
         if (lines == null) {
-            return List.of();
+            return new Tips(List.of(), List.of());
         }
-        List<String> out = new ArrayList<>(lines.size());
+        List<String> texts = new ArrayList<>(lines.size());
+        List<DumpText> components = new ArrayList<>(lines.size());
         for (TooltipLine line : lines) {
             if (line instanceof TooltipLine.Text text) {
                 String s = EmiTextLines.styledToString(text.component());
                 if (s != null) {
-                    out.add(s);
+                    texts.add(s);
+                }
+                DumpText component = DumpTexts.ofStyled(text.component());
+                if (component != null) {
+                    components.add(component);
                 }
             }
         }
-        return out;
+        return new Tips(List.copyOf(texts), List.copyOf(components));
     }
 }
