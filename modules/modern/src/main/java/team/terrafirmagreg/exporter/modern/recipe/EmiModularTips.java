@@ -97,8 +97,7 @@ class EmiModularTips {
         }
         boolean rendered = false;
         for (Widget writer : hit) {
-            Verdict verdict =
-                    VERDICTS.computeIfAbsent(new VerdictKey(category, writer.getClass()), k -> new Verdict());
+            Verdict verdict = VERDICTS.computeIfAbsent(new VerdictKey(category, writer.getClass()), k -> new Verdict());
             if (!verdict.stateful) {
                 if (verdict.probes >= RENDER_PROBES) {
                     continue;

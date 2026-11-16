@@ -12,6 +12,7 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import team.terrafirmagreg.exporter.modern.stack.TmrvEmiCache;
 
 @Mixin(targets = "dev.nolij.toomanyrecipeviewers.impl.jei.api.gui.builder.TMRVIngredientCollector", remap = false)
 public abstract class TmrvIngredientCollectorMixin {
@@ -50,22 +51,9 @@ public abstract class TmrvIngredientCollectorMixin {
         }
     }
 
-    @Inject(
-            method = "getEMIIngredient(Ljava/util/Map;)Ldev/emi/emi/api/stack/EmiIngredient;",
-            at = @At("RETURN"))
+    @Inject(method = "getEMIIngredient(Ljava/util/Map;)Ldev/emi/emi/api/stack/EmiIngredient;", at = @At("RETURN"))
     private void gameExporter$storeIngredient(Map<?, ?> overrides, CallbackInfoReturnable<EmiIngredient> cir) {
-        gameExporter$ingredient =
-                new TmrvEmiCache(collectedIngredients.size(), overrides, cir.getReturnValue().getEmiStacks());
-    }
-}
-
-record TmrvEmiCache(int size, Map<?, ?> overrides, List<EmiStack> stacks) {
-
-    boolean matches(int size, Map<?, ?> overrides) {
-        return this.size == size && this.overrides == overrides;
-    }
-
-    List<EmiStack> copyStacks() {
-        return stacks.stream().map(EmiStack::copy).toList();
+        gameExporter$ingredient = new TmrvEmiCache(
+                collectedIngredients.size(), overrides, cir.getReturnValue().getEmiStacks());
     }
 }

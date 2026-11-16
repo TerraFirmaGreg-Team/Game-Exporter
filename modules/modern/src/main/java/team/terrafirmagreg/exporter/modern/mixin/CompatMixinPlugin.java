@@ -25,8 +25,7 @@ public final class CompatMixinPlugin implements IMixinConfigPlugin {
     @Override
     public void onLoad(String mixinPackage) {
         ali = LoadingModList.get() != null && LoadingModList.get().getModFileById("ali") != null;
-        tmrv = LoadingModList.get() != null
-                && LoadingModList.get().getModFileById("toomanyrecipeviewers") != null;
+        tmrv = LoadingModList.get() != null && LoadingModList.get().getModFileById("toomanyrecipeviewers") != null;
     }
 
     @Override
