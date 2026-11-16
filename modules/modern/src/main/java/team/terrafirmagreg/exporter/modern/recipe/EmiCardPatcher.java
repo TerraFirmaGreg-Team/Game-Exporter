@@ -76,9 +76,7 @@ class EmiCardPatcher {
         patchWidgets(captures, items, EmiCardPatcher::mergeItems);
     }
 
-    static void tips(
-            List<RecipeLayoutPass.Capture> captures,
-            Map<String, List<CardWidget>> tips) {
+    static void tips(List<RecipeLayoutPass.Capture> captures, Map<String, List<CardWidget>> tips) {
         patchWidgets(captures, tips, EmiCardPatcher::mergeTips);
     }
 
@@ -256,8 +254,7 @@ class EmiCardPatcher {
         boolean added = false;
         for (CardWidget tip : tips) {
             boolean dup = merged.stream()
-                    .anyMatch(w ->
-                            w.x() == tip.x() && w.y() == tip.y() && w.w() == tip.w() && w.h() == tip.h());
+                    .anyMatch(w -> w.x() == tip.x() && w.y() == tip.y() && w.w() == tip.w() && w.h() == tip.h());
             if (!dup) {
                 merged.add(tip);
                 added = true;

@@ -8,7 +8,13 @@ import tools.jackson.databind.JsonNode;
 
 @Builder
 public record FluidStackEntry(
-        String id, EntryKind kind, String fluid, List<DumpText> tooltip, String langKey, JsonNode tag)
+        String id,
+        EntryKind kind,
+        String fluid,
+        List<DumpText> tooltip,
+        DumpText name,
+        String langKey,
+        JsonNode tag)
         implements StackEntry {
     public FluidStackEntry {
         kind = EntryKind.FLUID;
@@ -16,7 +22,8 @@ public record FluidStackEntry(
         tag = StackEntry.nbt(id, tag);
     }
 
-    public static FluidStackEntry of(String id, String fluid, List<DumpText> tooltip, String langKey) {
-        return new FluidStackEntry(id, EntryKind.FLUID, fluid, tooltip, langKey, null);
+    public static FluidStackEntry of(
+            String id, String fluid, List<DumpText> tooltip, DumpText name, String langKey) {
+        return new FluidStackEntry(id, EntryKind.FLUID, fluid, tooltip, name, langKey, null);
     }
 }

@@ -266,7 +266,7 @@ class EmiCardRender {
         List<Widget> drawn = viewH != null ? MemberGrid.templateWidgets(widgets) : widgets;
         renderWidgets(recipe, drawn, context, displayW);
         try {
-            EmiModularTips.sweep(drawn, context.raw(), displayW, displayH);
+            EmiModularTips.sweep(drawn, context.raw(), displayW, displayH, recipe);
         } catch (VirtualMachineError e) {
             throw e;
         } catch (Throwable t) {

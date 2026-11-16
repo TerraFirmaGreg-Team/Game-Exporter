@@ -64,7 +64,7 @@ public final class JeiStackSource implements StackSource {
             if (langKey != null && !langKey.endsWith(".name")) {
                 langKey = langKey + ".name";
             }
-            stacks.put(fluidId, FluidStackEntry.of(fluidId, fluidId, List.of(), langKey));
+            stacks.put(fluidId, FluidStackEntry.of(fluidId, fluidId, List.of(), null, langKey));
         }
         ExportLog.info("stacks: {}", Integer.valueOf(stacks.size()));
         return new StackSnapshot(stacks, StackSnapshot.demandOf(stacks));

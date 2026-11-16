@@ -13,6 +13,7 @@ import team.terrafirmagreg.exporter.contract.id.EntryKind;
 import team.terrafirmagreg.exporter.contract.id.ResourceId;
 import team.terrafirmagreg.exporter.contract.id.StackId;
 import team.terrafirmagreg.exporter.contract.text.*;
+import team.terrafirmagreg.exporter.data.stack.capture.FluidStackEntry;
 import team.terrafirmagreg.exporter.data.stack.capture.StackEntry;
 import tools.jackson.databind.JsonNode;
 
@@ -82,15 +83,18 @@ public class StackMerge {
 
     private static Display displayOf(
             StackEntry stack, Display fallback, EntryKind kind, String registryId, List<DisplayFill> fills) {
-        DumpText composed = nameLine(stack.tooltip());
+        DumpText captured = stack instanceof FluidStackEntry fluid ? fluid.name() : null;
+        DumpText composed = captured != null ? captured : nameLine(stack.tooltip());
+        List<DumpText> extra =
+                captured != null ? tooltipExcept(stack.tooltip(), captured) : extraTooltip(stack.tooltip());
         String langKey = stack.langKey();
         Map<String, List<DumpText>> mods = extraTooltipMods(stack.tooltipMods());
         String hoverNameLangKey = bareTranslateName(composed);
         if (hoverNameLangKey != null) {
-            return Display.of(hoverNameLangKey, extraTooltip(stack.tooltip()), mods);
+            return Display.of(hoverNameLangKey, extra, mods);
         }
         if (DisplayKeys.isLangKey(langKey)) {
-            return Display.of(langKey, extraTooltip(stack.tooltip()), mods);
+            return Display.of(langKey, extra, mods);
         }
         if (composed != null && fills != null) {
             boolean with = composed.with() != null && !composed.with().isEmpty();
@@ -98,14 +102,14 @@ public class StackMerge {
             if (with || literal) {
                 String unique = LangKeys.ofStack(kind, stack.id());
                 fills.add(new DisplayFill(ResourceId.namespaceOf(registryId), unique, composed));
-                return Display.of(unique, extraTooltip(stack.tooltip()), mods);
+                return Display.of(unique, extra, mods);
             }
         }
         String name = langKey;
         if (name == null || name.isBlank()) {
             name = fallback == null ? null : fallback.name();
         }
-        return Display.of(name, extraTooltip(stack.tooltip()), mods);
+        return Display.of(name, extra, mods);
     }
 
     private static String bareTranslateName(DumpText composed) {
@@ -154,5 +158,57 @@ public class StackMerge {
             }
         }
         return extra;
+    }
+
+    private static List<DumpText> tooltipExcept(List<DumpText> tooltip, DumpText name) {
+        if (tooltip == null || tooltip.isEmpty()) {
+            return List.of();
+        }
+        List<DumpText> out = new ArrayList<>(tooltip.size());
+        boolean skipped = false;
+        for (DumpText line : tooltip) {
+            if (line == null) {
+                continue;
+            }
+            if (!skipped && sameText(line, name)) {
+                skipped = true;
+                continue;
+            }
+            out.add(line);
+        }
+        return out;
+    }
+
+    private static boolean sameText(DumpText a, DumpText b) {
+        if (a == null || b == null) {
+            return false;
+        }
+        if (a.equals(b)) {
+            return true;
+        }
+        String pa = plainOf(a);
+        String pb = plainOf(b);
+        return !pa.isBlank() && pa.equals(pb);
+    }
+
+    private static String plainOf(DumpText node) {
+        if (node == null) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        if (node.text() != null) {
+            sb.append(node.text());
+        }
+        if (node.with() != null) {
+            for (DumpText arg : node.with()) {
+                sb.append(plainOf(arg));
+            }
+        }
+        if (node.extra() != null) {
+            for (DumpText child : node.extra()) {
+                sb.append(plainOf(child));
+            }
+        }
+        return sb.toString();
     }
 }

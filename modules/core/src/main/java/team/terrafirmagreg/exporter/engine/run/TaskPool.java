@@ -16,6 +16,9 @@ final class TaskPool {
     private final CancellationToken cancellation;
     private final CallerLane caller;
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
+    private final ExecutorService imageExecutor = Executors.newFixedThreadPool(
+            Math.clamp(Runtime.getRuntime().availableProcessors() * 2L, 4, 64),
+            Thread.ofPlatform().name("dump-image-", 0).factory());
     private final Set<Future<?>> pending = ConcurrentHashMap.newKeySet();
     private final BlockingQueue<Future<?>> completedQueue = new LinkedBlockingQueue<>();
     private final Semaphore imageSlots = new Semaphore(RunTasks.IMAGE_MAX_IN_FLIGHT);
@@ -28,6 +31,10 @@ final class TaskPool {
     }
 
     Future<?> submit(RunTasks.ThrowingRunnable task) {
+        return submitTo(executor, task);
+    }
+
+    private Future<?> submitTo(ExecutorService pool, RunTasks.ThrowingRunnable task) {
         cancellation.throwIfCancelled();
         reapCompletedQuietly();
         RunTasks.ThrowingRunnable bound = propagateComponent(task);
@@ -52,14 +59,14 @@ final class TaskPool {
                     }
                 };
         pending.add(tracked);
-        executor.execute(tracked);
+        pool.execute(tracked);
         return tracked;
     }
 
     Future<?> submitImage(RunTasks.ThrowingRunnable task) {
         acquireImageSlot();
         try {
-            return submit(() -> {
+            return submitTo(imageExecutor, () -> {
                 try {
                     task.run();
                 } finally {
@@ -115,6 +122,7 @@ final class TaskPool {
             future.cancel(true);
         }
         executor.shutdownNow();
+        imageExecutor.shutdownNow();
         try {
             executor.awaitTermination(5, TimeUnit.SECONDS);
         } catch (InterruptedException e) {

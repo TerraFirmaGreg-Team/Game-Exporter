@@ -126,7 +126,16 @@ public final class EmiStackSource implements StackSource {
         }
         String fluidId = loc.toString();
         String id = StackId.format(fluidId, nbt(emi));
-        return FluidStackEntry.of(id, fluidId, fluidTooltip(emi), null);
+        return FluidStackEntry.of(id, fluidId, fluidTooltip(emi), fluidName(emi), null);
+    }
+
+    private static DumpText fluidName(EmiStack emi) {
+        try {
+            Component name = emi.getName();
+            return name == null ? null : DumpTexts.ofStyled(name);
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     private static String nbt(EmiStack emi) {
@@ -153,7 +162,7 @@ public final class EmiStackSource implements StackSource {
                     continue;
                 }
                 String plain = DumpTexts.plain(text);
-                if (plain.isEmpty() || plain.equals(amountText)) {
+                if (DumpTexts.empty(text) || plain.equals(amountText)) {
                     continue;
                 }
                 out.add(text);

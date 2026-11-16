@@ -17,11 +17,16 @@ public final class CompatMixinPlugin implements IMixinConfigPlugin {
             "AliLootOptionAccessor",
             "AliLootHeightMixin");
 
+    private static final Set<String> TMRV_MIXINS = Set.of("TmrvIngredientCollectorMixin");
+
     private boolean ali;
+    private boolean tmrv;
 
     @Override
     public void onLoad(String mixinPackage) {
         ali = LoadingModList.get() != null && LoadingModList.get().getModFileById("ali") != null;
+        tmrv = LoadingModList.get() != null
+                && LoadingModList.get().getModFileById("toomanyrecipeviewers") != null;
     }
 
     @Override
@@ -34,6 +39,9 @@ public final class CompatMixinPlugin implements IMixinConfigPlugin {
         String simple = mixinClassName.substring(mixinClassName.lastIndexOf('.') + 1);
         if (ALI_MIXINS.contains(simple)) {
             return ali;
+        }
+        if (TMRV_MIXINS.contains(simple)) {
+            return tmrv;
         }
         return true;
     }

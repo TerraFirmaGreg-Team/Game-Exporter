@@ -29,6 +29,7 @@
         "EmiAgnosMixin",
         "EmiListIngredientMixin",
         "EmiGeneratedSlotMixin",
+        "TmrvIngredientCollectorMixin",
         "ClientTextTooltipAccessor",
         "ClientLanguageMixin",
         "EmiInfoRecipeMixin",
